@@ -8,11 +8,12 @@ import { notFoundHandler } from "./middleware/notFoundHandler";
 import { apiRouter } from "./routes";
 
 export const app = express();
+const vercelPreviewPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || env.clientUrls.includes(origin)) {
+      if (!origin || env.clientUrls.includes(origin) || vercelPreviewPattern.test(origin)) {
         callback(null, true);
         return;
       }

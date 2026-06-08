@@ -1,23 +1,7 @@
 import axios from "axios";
 
-const productionApiBaseUrlByHost: Record<string, string> = {
-  "performai-hub-frontend.vercel.app": "https://fadfe5bc1f3b51.lhr.life/api"
-};
-
-function resolveApiBaseUrl() {
-  if (typeof window !== "undefined") {
-    const productionApiBaseUrl = productionApiBaseUrlByHost[window.location.hostname];
-
-    if (productionApiBaseUrl) {
-      return productionApiBaseUrl;
-    }
-  }
-
-  return import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:4000/api";
-}
-
 export const api = axios.create({
-  baseURL: resolveApiBaseUrl()
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:4000/api"
 });
 
 let unauthorizedHandler: (() => void) | null = null;
