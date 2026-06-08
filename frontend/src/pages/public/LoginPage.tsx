@@ -3,10 +3,10 @@ import type { FormEvent } from "react";
 import clsx from "clsx";
 import { Link, useNavigate } from "react-router-dom";
 import { Moon, Sun } from "lucide-react";
-import axios from "axios";
 
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { getApiErrorMessage } from "../../lib/getApiErrorMessage";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -27,11 +27,7 @@ export function LoginPage() {
       await login(email, password);
       navigate("/dashboard");
     } catch (submissionError) {
-      if (axios.isAxiosError(submissionError)) {
-        setError(submissionError.response?.data?.message ?? "Unable to sign in.");
-      } else {
-        setError(submissionError instanceof Error ? submissionError.message : "Unable to sign in.");
-      }
+      setError(getApiErrorMessage(submissionError, "Unable to sign in."));
     } finally {
       setLoading(false);
     }
