@@ -4,6 +4,29 @@ export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:4000/api"
 });
 
+export function getFileUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const configuredBaseUrl = api.defaults.baseURL;
+
+  if (configuredBaseUrl) {
+    try {
+      return new URL(normalizedPath, configuredBaseUrl).toString();
+    } catch {
+      // Fall back to the browser origin when URL parsing is not possible.
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${normalizedPath}`;
+  }
+
+  return normalizedPath;
+}
+
 let unauthorizedHandler: (() => void) | null = null;
 
 api.interceptors.response.use(

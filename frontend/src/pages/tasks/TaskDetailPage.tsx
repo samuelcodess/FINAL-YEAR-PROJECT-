@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { PageHeader } from "../../components/common/PageHeader";
 import { useAuth } from "../../context/AuthContext";
-import { api } from "../../lib/api";
+import { api, getFileUrl } from "../../lib/api";
 import { getApiErrorMessage } from "../../lib/getApiErrorMessage";
 
 type TaskPriority = "low" | "medium" | "high";
@@ -434,7 +434,7 @@ export function TaskDetailPage() {
                         {submission.attachments.map((attachment) => (
                           <a
                             className="inline-flex text-sm font-medium text-brand-700"
-                            href={`http://127.0.0.1:4002${attachment.fileUrl}`}
+                            href={getFileUrl(attachment.fileUrl)}
                             key={attachment.id}
                             rel="noreferrer"
                             target="_blank"

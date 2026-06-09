@@ -10,7 +10,7 @@ import {
   getResourceGoalCards,
   getResourceMilestones
 } from "../../data/resourceLibrary";
-import { api } from "../../lib/api";
+import { api, getFileUrl } from "../../lib/api";
 import { getApiErrorMessage } from "../../lib/getApiErrorMessage";
 import {
   getImpactLabel,
@@ -299,13 +299,13 @@ function renderReviewSummary(submission: SubmissionRecord) {
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Attachments</p>
           <div className="mt-3 space-y-2">
-            {submission.attachments.map((attachment) => (
-              <a
-                className="inline-flex text-sm font-medium text-brand-700"
-                href={`http://127.0.0.1:4002${attachment.fileUrl}`}
-                key={attachment.id}
-                rel="noreferrer"
-                target="_blank"
+              {submission.attachments.map((attachment) => (
+                <a
+                  className="inline-flex text-sm font-medium text-brand-700"
+                  href={getFileUrl(attachment.fileUrl)}
+                  key={attachment.id}
+                  rel="noreferrer"
+                  target="_blank"
               >
                 {attachment.originalName} ({Math.ceil(attachment.fileSize / 1024)} KB)
               </a>
