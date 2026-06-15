@@ -44,6 +44,27 @@ type SubmissionResult = {
   explanation: string;
   aiSummary: string;
   evaluationSource: string;
+  evaluationPeriod: {
+    startDate: string;
+    endDate: string;
+  };
+  taskMetrics: {
+    totalTasks: number;
+    completedTasks: number;
+    approvedTasks: number;
+    submittedTasks: number;
+    overdueTasks: number;
+    onTimeTasks: number;
+    reviewedTasks: number;
+    revisionRequests: number;
+    attachmentCount: number;
+    averageSubmissionWords: number;
+    completionRate: number;
+    approvalRate: number;
+    onTimeRate: number | null;
+    revisionRate: number;
+  };
+  taskHighlights: string[];
   strengths: string[];
   risks: string[];
   evaluatedDetails: Array<{
@@ -76,9 +97,10 @@ export function EvaluationPage() {
   const [kpis, setKpis] = useState<Kpi[]>([]);
   const [form, setForm] = useState({
     employeeId: "",
+    periodStartDate: "",
+    periodEndDate: "",
     evaluationDate: "",
     remarks: "",
-    evidence: ""
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -118,18 +140,20 @@ export function EvaluationPage() {
     try {
       const payload = {
         employeeId: Number(form.employeeId),
+        periodStartDate: form.periodStartDate,
+        periodEndDate: form.periodEndDate,
         evaluationDate: form.evaluationDate,
-        remarks: form.remarks,
-        evidence: form.evidence
+        remarks: form.remarks
       };
 
       const response = await api.post<SubmissionResult>("/evaluations", payload);
       setSubmissionResult(response.data);
       setForm({
         employeeId: "",
+        periodStartDate: "",
+        periodEndDate: "",
         evaluationDate: "",
-        remarks: "",
-        evidence: ""
+        remarks: ""
       });
       await loadPageData();
     } catch (submissionError) {
@@ -144,7 +168,7 @@ export function EvaluationPage() {
       <PageHeader
         eyebrow="Evaluations"
         title="Evaluation management"
-        description="Submit evidence for AI-assisted KPI evaluation and review the recommendation outcome."
+        description="Generate KPI evaluations from real task activity, deadlines, submissions, and review outcomes."
       />
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -172,6 +196,38 @@ export function EvaluationPage() {
               </select>
             </label>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Period start</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.periodStartDate}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      periodStartDate: event.target.value
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Period end</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.periodEndDate}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      periodEndDate: event.target.value
+                    }))
+                  }
+                />
+              </label>
+            </div>
+
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Evaluation date</span>
               <input
@@ -190,9 +246,9 @@ export function EvaluationPage() {
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-semibold text-slate-950">AI scoring rubric</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                The AI will score the employee against the configured KPIs using the evidence you provide below.
-                Include completed work, measurable outcomes, quality signals, collaboration notes, delays, and
-                any issues that should influence the result.
+                The AI will score the employee against the configured KPIs using real task records from the selected
+                period. It reads due dates, completion outcomes, submission quality, revision history, approval
+                signals, and manager review notes before producing the KPI breakdown.
               </p>
               <div className="mt-4 grid gap-3">
                 {kpis.map((kpi) => (
@@ -210,25 +266,10 @@ export function EvaluationPage() {
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Evaluation evidence</span>
-              <textarea
-                className="input min-h-40"
-                placeholder="Describe the employee's completed tasks, quality of work, timeliness, communication, initiative, strengths, and any recurring issues. The AI will use this evidence to score each KPI."
-                value={form.evidence}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    evidence: event.target.value
-                  }))
-                }
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Additional manager remarks</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700">Additional manager context</span>
               <textarea
                 className="input min-h-28"
-                placeholder="Optional notes for extra context"
+                placeholder="Optional notes for context the system cannot infer directly from task records."
                 value={form.remarks}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -246,11 +287,44 @@ export function EvaluationPage() {
                   AI evaluation saved with score {submissionResult.totalScore} and a{" "}
                   {submissionResult.performanceLevel.replace("_", " ")} rating.
                 </p>
+                <p className="mt-2">
+                  Evaluation period: {submissionResult.evaluationPeriod.startDate} to{" "}
+                  {submissionResult.evaluationPeriod.endDate}
+                </p>
                 <p className="mt-2">{submissionResult.aiSummary}</p>
                 <p className="mt-2">Trend: {submissionResult.trend}</p>
                 <p className="mt-2">Evaluation source: {submissionResult.evaluationSource.split("_").join(" ")}</p>
                 <p className="mt-2">Recommendations: {submissionResult.recommendationTypes.join(", ")}</p>
                 <p className="mt-2">{submissionResult.explanation}</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-brand-200 bg-white/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Task coverage</p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      {submissionResult.taskMetrics.totalTasks} tasks analyzed, {submissionResult.taskMetrics.completedTasks} completed,
+                      {submissionResult.taskMetrics.approvedTasks} approved.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-brand-200 bg-white/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Timeliness</p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      {submissionResult.taskMetrics.onTimeRate === null
+                        ? "No due-date signal was available."
+                        : `${submissionResult.taskMetrics.onTimeTasks} on-time tasks, ${submissionResult.taskMetrics.overdueTasks} late tasks, ${submissionResult.taskMetrics.onTimeRate}% on-time rate.`}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-brand-200 bg-white/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Revisions</p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      {submissionResult.taskMetrics.revisionRequests} revision requests across {submissionResult.taskMetrics.reviewedTasks} reviewed tasks.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-brand-200 bg-white/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Submission depth</p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      Average submission length: {submissionResult.taskMetrics.averageSubmissionWords} words. Attachments reviewed: {submissionResult.taskMetrics.attachmentCount}.
+                    </p>
+                  </div>
+                </div>
                 {submissionResult.strengths.length > 0 ? (
                   <p className="mt-2">Strengths: {submissionResult.strengths.join(", ")}</p>
                 ) : null}
@@ -275,6 +349,16 @@ export function EvaluationPage() {
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600">{detail.rationale}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {submissionResult.taskHighlights.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    <p className="font-semibold text-slate-950">Task evidence highlights</p>
+                    {submissionResult.taskHighlights.map((highlight, index) => (
+                      <div className="rounded-2xl border border-brand-200 bg-white/70 p-3" key={`${index}-${highlight.slice(0, 24)}`}>
+                        <p className="text-sm leading-6 text-slate-600">{highlight}</p>
                       </div>
                     ))}
                   </div>

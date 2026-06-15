@@ -45,6 +45,38 @@ export async function listTaskSubmissions(taskId: number) {
   return rows as TaskSubmissionRow[];
 }
 
+export async function listTaskSubmissionsForTaskIds(taskIds: number[]) {
+  if (taskIds.length === 0) {
+    return [] as TaskSubmissionRow[];
+  }
+
+  const placeholders = taskIds.map(() => "?").join(", ");
+  const [rows] = await pool.query(
+    `SELECT
+       s.id,
+       s.task_id AS taskId,
+       s.employee_id AS employeeId,
+       employee_user.full_name AS employeeName,
+       s.submission_note AS submissionNote,
+       s.status,
+       s.review_comment AS reviewComment,
+       s.reviewed_by AS reviewedBy,
+       reviewer.full_name AS reviewedByName,
+       DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+       DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+       DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+     FROM task_submissions s
+     INNER JOIN employees e ON e.id = s.employee_id
+     INNER JOIN users employee_user ON employee_user.id = e.user_id
+     LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+     WHERE s.task_id IN (${placeholders})
+     ORDER BY s.created_at DESC, s.id DESC`,
+    taskIds
+  );
+
+  return rows as TaskSubmissionRow[];
+}
+
 export async function createTaskSubmission(
   connection: PoolConnection,
   input: {

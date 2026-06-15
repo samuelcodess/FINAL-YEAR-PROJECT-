@@ -177,6 +177,51 @@ export async function findTaskById(taskId: number) {
   return (rows as TaskRow[])[0] ?? null;
 }
 
+export async function listTasksForEmployeeEvaluation(input: {
+  employeeId: number;
+  periodStartDate: string;
+  periodEndDate: string;
+}) {
+  const [rows] = await pool.query(
+    `SELECT
+       t.id,
+       t.employee_id AS employeeId,
+       e.user_id AS employeeUserId,
+       employee_user.full_name AS employeeName,
+       e.employee_code AS employeeCode,
+       d.department_name AS departmentName,
+       t.assigned_by AS assignedBy,
+       assigner.full_name AS assignedByName,
+       t.title,
+       t.description,
+       t.linked_kpi_id AS linkedKpiId,
+       k.kpi_name AS linkedKpiName,
+       t.priority,
+       t.status,
+       DATE_FORMAT(t.due_date, '%Y-%m-%d') AS dueDate,
+       DATE_FORMAT(t.submitted_at, '%Y-%m-%d %H:%i:%s') AS submittedAt,
+       t.reviewed_by AS reviewedBy,
+       reviewer.full_name AS reviewedByName,
+       DATE_FORMAT(t.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+       t.review_comment AS reviewComment,
+       DATE_FORMAT(t.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+       DATE_FORMAT(t.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+     FROM tasks t
+     INNER JOIN employees e ON e.id = t.employee_id
+     INNER JOIN users employee_user ON employee_user.id = e.user_id
+     LEFT JOIN departments d ON d.id = e.department_id
+     INNER JOIN users assigner ON assigner.id = t.assigned_by
+     LEFT JOIN users reviewer ON reviewer.id = t.reviewed_by
+     LEFT JOIN kpis k ON k.id = t.linked_kpi_id
+     WHERE t.employee_id = ?
+       AND DATE(t.created_at) BETWEEN ? AND ?
+     ORDER BY t.created_at DESC, t.id DESC`,
+    [input.employeeId, input.periodStartDate, input.periodEndDate]
+  );
+
+  return rows as TaskRow[];
+}
+
 export async function createTask(
   connection: PoolConnection,
   input: {

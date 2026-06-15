@@ -28,6 +28,7 @@ import {
 } from "./recommendationService";
 import { generateAiEvaluation } from "./aiEvaluationService";
 import { getEmployeeIdByUserId } from "./employeeService";
+import { buildTaskEvaluationEvidence } from "./taskEvaluationEvidenceService";
 
 export async function listEvaluations(user: AuthenticatedUser) {
   const employeeId = user.role === "employee" ? await getEmployeeIdByUserId(user.id) : null;
@@ -44,7 +45,8 @@ export async function createEvaluation(
     employeeId?: number;
     evaluationDate?: string;
     remarks?: string;
-    evidence?: string;
+    periodStartDate?: string;
+    periodEndDate?: string;
   },
   evaluator: AuthenticatedUser
 ) {
@@ -72,11 +74,21 @@ export async function createEvaluation(
     throw new ApiError(400, "Configured KPI weights do not match the expected total.");
   }
 
+  const taskEvidence = await buildTaskEvaluationEvidence({
+    employeeId: input.employeeId,
+    periodStartDate: input.periodStartDate,
+    periodEndDate: input.periodEndDate
+  });
+
+  if (taskEvidence.metrics.totalTasks === 0) {
+    throw new ApiError(400, "No task records were found for the selected employee and evaluation period.");
+  }
+
   const aiEvaluation = await generateAiEvaluation({
     employeeName: employee.fullName,
-    evidence: input.evidence,
     remarks: input.remarks,
-    kpis: matchedKpis
+    kpis: matchedKpis,
+    taskEvidence
   });
   const details: EvaluationDetailInput[] = aiEvaluation.details.map((detail) => ({
     kpiId: detail.kpiId,
@@ -107,7 +119,7 @@ export async function createEvaluation(
       performanceLevel,
       recommendation: explanation,
       remarks: input.remarks,
-      evidence: input.evidence,
+      evidence: taskEvidence.summary,
       aiSummary: aiEvaluation.summary,
       evaluationMode: "ai",
       trend
@@ -160,6 +172,12 @@ export async function createEvaluation(
     explanation,
     aiSummary: aiEvaluation.summary,
     evaluationSource: aiEvaluation.source,
+    evaluationPeriod: {
+      startDate: taskEvidence.periodStartDate,
+      endDate: taskEvidence.periodEndDate
+    },
+    taskMetrics: taskEvidence.metrics,
+    taskHighlights: taskEvidence.taskHighlights,
     strengths: aiEvaluation.strengths,
     risks: aiEvaluation.risks,
     evaluatedDetails: aiEvaluation.details.map((detail) => ({
