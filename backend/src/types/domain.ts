@@ -108,6 +108,9 @@ export type EvaluationRecord = {
   performanceLevel: PerformanceLevel;
   recommendation: string;
   remarks: string;
+  evidence: string;
+  aiSummary: string;
+  evaluationMode: "manual" | "ai";
   trend: Trend;
 };
 

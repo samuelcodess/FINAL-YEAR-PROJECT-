@@ -20,13 +20,13 @@ import {
 import {
   buildRecommendationExplanation,
   buildSupportMaterials,
-  calculateWeightedScore,
   classifyPerformance,
   detectTrend,
   generateRecommendationTypes
   ,
   identifyFocusAreas
 } from "./recommendationService";
+import { generateAiEvaluation } from "./aiEvaluationService";
 import { getEmployeeIdByUserId } from "./employeeService";
 
 export async function listEvaluations(user: AuthenticatedUser) {
@@ -44,7 +44,7 @@ export async function createEvaluation(
     employeeId?: number;
     evaluationDate?: string;
     remarks?: string;
-    details?: EvaluationDetailInput[];
+    evidence?: string;
   },
   evaluator: AuthenticatedUser
 ) {
@@ -55,30 +55,39 @@ export async function createEvaluation(
     throw new ApiError(404, "Selected employee was not found.");
   }
 
-  const kpiIds = input.details.map((detail) => detail.kpiId);
-  const matchedKpis = await findKpisByIds(kpiIds);
   const allKpis = await listKpisFromRepository();
   const totalAvailableWeight = await getTotalKpiWeight();
+  const matchedKpis = await findKpisByIds(allKpis.map((kpi) => kpi.id));
 
-  if (matchedKpis.length !== input.details.length || matchedKpis.length !== allKpis.length) {
-    throw new ApiError(400, "Evaluations must include each configured KPI exactly once.");
+  if (matchedKpis.length !== allKpis.length) {
+    throw new ApiError(400, "The configured KPI set is incomplete and cannot be evaluated.");
   }
 
-  const submittedWeight = matchedKpis.reduce(
+  const configuredWeight = matchedKpis.reduce(
     (sum, kpi) => sum + Number(kpi.weightPercentage),
     0
   );
 
-  if (Number(submittedWeight.toFixed(2)) !== Number(totalAvailableWeight.toFixed(2))) {
-    throw new ApiError(400, "Submitted KPI weights do not match the configured total.");
+  if (Number(configuredWeight.toFixed(2)) !== Number(totalAvailableWeight.toFixed(2))) {
+    throw new ApiError(400, "Configured KPI weights do not match the expected total.");
   }
 
-  const totalScore = calculateWeightedScore(input.details, matchedKpis);
+  const aiEvaluation = await generateAiEvaluation({
+    employeeName: employee.fullName,
+    evidence: input.evidence,
+    remarks: input.remarks,
+    kpis: matchedKpis
+  });
+  const details: EvaluationDetailInput[] = aiEvaluation.details.map((detail) => ({
+    kpiId: detail.kpiId,
+    score: detail.score
+  }));
+  const totalScore = aiEvaluation.overallScore;
   const performanceLevel = classifyPerformance(totalScore);
   const previousScores = await listPreviousScores(input.employeeId);
   const trend = detectTrend(previousScores, totalScore);
   const recommendationTypes = generateRecommendationTypes(totalScore, previousScores);
-  const focusAreas = identifyFocusAreas(input.details, matchedKpis);
+  const focusAreas = identifyFocusAreas(details, matchedKpis);
   const explanation = buildRecommendationExplanation(
     recommendationTypes,
     totalScore,
@@ -98,10 +107,13 @@ export async function createEvaluation(
       performanceLevel,
       recommendation: explanation,
       remarks: input.remarks,
+      evidence: input.evidence,
+      aiSummary: aiEvaluation.summary,
+      evaluationMode: "ai",
       trend
     });
 
-    await insertEvaluationDetails(connection, nextEvaluationId, input.details);
+    await insertEvaluationDetails(connection, nextEvaluationId, details);
     await insertRecommendations(connection, {
       employeeId: input.employeeId,
       evaluationId: nextEvaluationId,
@@ -146,6 +158,14 @@ export async function createEvaluation(
     trend,
     recommendationTypes,
     explanation,
+    aiSummary: aiEvaluation.summary,
+    evaluationSource: aiEvaluation.source,
+    strengths: aiEvaluation.strengths,
+    risks: aiEvaluation.risks,
+    evaluatedDetails: aiEvaluation.details.map((detail) => ({
+      ...detail,
+      kpiName: matchedKpis.find((kpi) => kpi.id === detail.kpiId)?.kpiName ?? "Unknown KPI"
+    })),
     focusAreas,
     materials: materials.map((material) => ({
       ...material,

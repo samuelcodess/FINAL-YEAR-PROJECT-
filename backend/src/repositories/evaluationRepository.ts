@@ -12,6 +12,9 @@ type EvaluationListRow = {
   performanceLevel: string;
   recommendation: string;
   remarks: string;
+  evidence: string;
+  aiSummary: string;
+  evaluationMode: string;
   trend: string;
   employeeName: string;
   departmentName: string;
@@ -57,6 +60,9 @@ export async function listEvaluationsForRole(input: {
        ev.performance_level AS performanceLevel,
        ev.recommendation,
        ev.remarks,
+       ev.source_summary AS evidence,
+       ev.ai_summary AS aiSummary,
+       ev.evaluation_mode AS evaluationMode,
        ev.trend,
        u.full_name AS employeeName,
        d.department_name AS departmentName
@@ -140,6 +146,9 @@ export async function createEvaluationRecord(
     performanceLevel: string;
     recommendation: string;
     remarks: string;
+    evidence: string;
+    aiSummary: string;
+    evaluationMode: "manual" | "ai";
     trend: Trend;
   }
 ) {
@@ -152,8 +161,11 @@ export async function createEvaluationRecord(
        performance_level,
        recommendation,
        remarks,
+       source_summary,
+       ai_summary,
+       evaluation_mode,
        trend
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.employeeId,
       input.evaluatorId,
@@ -162,6 +174,9 @@ export async function createEvaluationRecord(
       input.performanceLevel,
       input.recommendation,
       input.remarks,
+      input.evidence,
+      input.aiSummary,
+      input.evaluationMode,
       input.trend
     ]
   );

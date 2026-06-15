@@ -16,6 +16,8 @@ type Evaluation = {
   performanceLevel: string;
   trend: string;
   recommendation: string;
+  aiSummary?: string;
+  evaluationMode?: string;
 };
 
 type EmployeeOption = {
@@ -40,6 +42,16 @@ type SubmissionResult = {
   trend: string;
   recommendationTypes: string[];
   explanation: string;
+  aiSummary: string;
+  evaluationSource: string;
+  strengths: string[];
+  risks: string[];
+  evaluatedDetails: Array<{
+    kpiId: number;
+    kpiName: string;
+    score: number;
+    rationale: string;
+  }>;
   focusAreas: Array<{
     kpiName: string;
     score: number;
@@ -66,7 +78,7 @@ export function EvaluationPage() {
     employeeId: "",
     evaluationDate: "",
     remarks: "",
-    details: {} as Record<number, string>
+    evidence: ""
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -88,12 +100,6 @@ export function EvaluationPage() {
       setEvaluations(evaluationResponse.data);
       setEmployees(employeeResponse.data.items);
       setKpis(kpiResponse.data);
-      setForm((current) => ({
-        ...current,
-        details: Object.fromEntries(
-          kpiResponse.data.map((kpi) => [kpi.id, current.details[kpi.id] ?? ""])
-        )
-      }));
     } catch (loadError) {
       setError(getApiErrorMessage(loadError, "Unable to load evaluation data."));
     }
@@ -102,16 +108,6 @@ export function EvaluationPage() {
   useEffect(() => {
     void loadPageData();
   }, []);
-
-  function updateDetail(kpiId: number, value: string) {
-    setForm((current) => ({
-      ...current,
-      details: {
-        ...current.details,
-        [kpiId]: value
-      }
-    }));
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,10 +120,7 @@ export function EvaluationPage() {
         employeeId: Number(form.employeeId),
         evaluationDate: form.evaluationDate,
         remarks: form.remarks,
-        details: kpis.map((kpi) => ({
-          kpiId: kpi.id,
-          score: Number(form.details[kpi.id] ?? 0)
-        }))
+        evidence: form.evidence
       };
 
       const response = await api.post<SubmissionResult>("/evaluations", payload);
@@ -136,7 +129,7 @@ export function EvaluationPage() {
         employeeId: "",
         evaluationDate: "",
         remarks: "",
-        details: Object.fromEntries(kpis.map((kpi) => [kpi.id, ""]))
+        evidence: ""
       });
       await loadPageData();
     } catch (submissionError) {
@@ -151,12 +144,12 @@ export function EvaluationPage() {
       <PageHeader
         eyebrow="Evaluations"
         title="Evaluation management"
-        description="Review submitted evaluations and prepare new KPI-based performance assessments."
+        description="Submit evidence for AI-assisted KPI evaluation and review the recommendation outcome."
       />
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="panel p-6">
-          <h2 className="text-xl font-semibold text-slate-950">New evaluation form</h2>
+          <h2 className="text-xl font-semibold text-slate-950">New AI evaluation</h2>
           <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Employee</span>
@@ -194,28 +187,48 @@ export function EvaluationPage() {
               />
             </label>
 
-            {kpis.map((kpi) => (
-              <label className="block" key={kpi.id}>
-                <span className="mb-2 block text-sm font-medium text-slate-700">
-                  {kpi.kpiName} ({kpi.weightPercentage}%)
-                </span>
-                <input
-                  className="input"
-                  max={100}
-                  min={0}
-                  placeholder={`Score for ${kpi.kpiName}`}
-                  type="number"
-                  value={form.details[kpi.id] ?? ""}
-                  onChange={(event) => updateDetail(kpi.id, event.target.value)}
-                />
-              </label>
-            ))}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-950">AI scoring rubric</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                The AI will score the employee against the configured KPIs using the evidence you provide below.
+                Include completed work, measurable outcomes, quality signals, collaboration notes, delays, and
+                any issues that should influence the result.
+              </p>
+              <div className="mt-4 grid gap-3">
+                {kpis.map((kpi) => (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3" key={kpi.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-slate-950">{kpi.kpiName}</p>
+                      <span className="rounded-full bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">
+                        {kpi.weightPercentage}%
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">{kpi.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Remarks</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700">Evaluation evidence</span>
+              <textarea
+                className="input min-h-40"
+                placeholder="Describe the employee's completed tasks, quality of work, timeliness, communication, initiative, strengths, and any recurring issues. The AI will use this evidence to score each KPI."
+                value={form.evidence}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    evidence: event.target.value
+                  }))
+                }
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Additional manager remarks</span>
               <textarea
                 className="input min-h-28"
-                placeholder="Optional remarks"
+                placeholder="Optional notes for extra context"
                 value={form.remarks}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -230,17 +243,41 @@ export function EvaluationPage() {
             {submissionResult ? (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-950">
-                  Evaluation saved with score {submissionResult.totalScore} and a{" "}
+                  AI evaluation saved with score {submissionResult.totalScore} and a{" "}
                   {submissionResult.performanceLevel.replace("_", " ")} rating.
                 </p>
+                <p className="mt-2">{submissionResult.aiSummary}</p>
                 <p className="mt-2">Trend: {submissionResult.trend}</p>
+                <p className="mt-2">Evaluation source: {submissionResult.evaluationSource.split("_").join(" ")}</p>
                 <p className="mt-2">Recommendations: {submissionResult.recommendationTypes.join(", ")}</p>
                 <p className="mt-2">{submissionResult.explanation}</p>
+                {submissionResult.strengths.length > 0 ? (
+                  <p className="mt-2">Strengths: {submissionResult.strengths.join(", ")}</p>
+                ) : null}
+                {submissionResult.risks.length > 0 ? (
+                  <p className="mt-2">Risks: {submissionResult.risks.join(", ")}</p>
+                ) : null}
                 {submissionResult.focusAreas.length > 0 ? (
                   <p className="mt-2">
                     Focus areas:{" "}
                     {submissionResult.focusAreas.map((item) => `${item.kpiName} (${item.score})`).join(", ")}
                   </p>
+                ) : null}
+                {submissionResult.evaluatedDetails.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    <p className="font-semibold text-slate-950">AI KPI breakdown</p>
+                    {submissionResult.evaluatedDetails.map((detail) => (
+                      <div className="rounded-2xl border border-brand-200 bg-white/70 p-3" key={detail.kpiId}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium text-slate-950">{detail.kpiName}</p>
+                          <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+                            {detail.score}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">{detail.rationale}</p>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
                 {submissionResult.materials.length > 0 ? (
                   <div className="mt-4 space-y-2">
@@ -289,7 +326,7 @@ export function EvaluationPage() {
             ) : null}
 
             <button className="btn-primary mt-2" disabled={saving} type="submit">
-              {saving ? "Submitting..." : "Calculate and submit"}
+              {saving ? "Submitting..." : "Run AI evaluation"}
             </button>
           </form>
         </section>
@@ -313,6 +350,9 @@ export function EvaluationPage() {
                 <p className="mt-3 text-sm font-medium capitalize text-slate-700">
                   {evaluation.performanceLevel.replace("_", " ")}
                 </p>
+                {evaluation.aiSummary ? (
+                  <p className="mt-3 text-sm leading-6 text-slate-500">{evaluation.aiSummary}</p>
+                ) : null}
                 <p className="mt-3 text-sm text-slate-500">Trend: {evaluation.trend}</p>
                 <p className="mt-2 text-sm leading-6 text-slate-500">{evaluation.recommendation}</p>
               </article>

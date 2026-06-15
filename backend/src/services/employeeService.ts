@@ -48,6 +48,9 @@ export async function listEmployees(input?: {
                 | "poor",
               recommendation: "",
               remarks: "",
+              evidence: "",
+              aiSummary: "",
+              evaluationMode: "ai",
               trend: (employee.latestTrend ?? "stable") as "improving" | "stable" | "declining"
             })
     })),

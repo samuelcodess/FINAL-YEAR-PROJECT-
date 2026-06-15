@@ -32,6 +32,8 @@ export const env = {
   dbUser: process.env.DB_USER ?? "root",
   dbPassword: process.env.DB_PASSWORD ?? "",
   dbName: process.env.DB_NAME ?? "employee_performance_ai",
+  aiServiceUrl: process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000",
+  aiServiceTimeoutMs: Number(process.env.AI_SERVICE_TIMEOUT_MS ?? 4000),
   smtpHost: process.env.SMTP_HOST ?? "",
   smtpPort: Number(process.env.SMTP_PORT ?? 587),
   smtpSecure: process.env.SMTP_SECURE === "true",

@@ -1,11 +1,11 @@
 # AI-Enhanced Employee Performance Evaluation and Recommendation System
 
-This repository contains a production-style academic final year project for an intelligent HR decision-support platform. The system helps organizations evaluate employee performance with weighted KPIs, generate explainable recommendations using rule-based AI logic, track performance trends over time, and present actionable insights through role-based dashboards.
+This repository contains a production-style academic final year project for an intelligent HR decision-support platform. The system helps organizations evaluate employee performance against weighted KPIs using AI-assisted evidence analysis, generate explainable recommendations from those outcomes, track performance trends over time, and present actionable insights through role-based dashboards.
 
 ## Core objectives
 
 - Manage employee, department, and KPI records
-- Evaluate staff using weighted KPI scoring
+- Evaluate staff using AI-generated KPI scoring from submitted evidence
 - Classify performance levels automatically
 - Generate explainable recommendations from evaluation outcomes
 - Detect improving, stable, and declining trends
@@ -84,7 +84,7 @@ The frontend is organized into:
 - REST API implementation
 - Authentication and authorization
 - Reports and dashboard analytics
-- Rule-based AI recommendation engine
+- AI-assisted evaluation and recommendation engine
 - README and installation instructions
 
 ## Development flow
@@ -94,7 +94,7 @@ The frontend is organized into:
 3. Build frontend foundation
 4. Implement authentication
 5. Implement employee, KPI, and evaluation workflows
-6. Add rule-based AI recommendation logic
+6. Add AI-based evaluation and recommendation logic
 7. Add reporting, analytics, notifications, and polish
 
 ## Status
