@@ -95,6 +95,7 @@ export function EvaluationPage() {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [kpis, setKpis] = useState<Kpi[]>([]);
+  const [employeeLoadError, setEmployeeLoadError] = useState("");
   const [form, setForm] = useState({
     employeeId: "",
     periodStartDate: "",
@@ -107,23 +108,40 @@ export function EvaluationPage() {
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
 
   async function loadPageData() {
-    try {
-      setError("");
+    setError("");
+    setEmployeeLoadError("");
 
-      const [evaluationResponse, employeeResponse, kpiResponse] = await Promise.all([
-        api.get<Evaluation[]>("/evaluations"),
-        api.get<{
-          items: EmployeeOption[];
-          total: number;
-        }>("/employees"),
-        api.get<Kpi[]>("/kpis")
-      ]);
+    const [evaluationResult, employeeResult, kpiResult] = await Promise.allSettled([
+      api.get<Evaluation[]>("/evaluations"),
+      api.get<{
+        items: EmployeeOption[];
+        total: number;
+      }>("/employees", {
+        params: {
+          page: 1,
+          pageSize: 100
+        }
+      }),
+      api.get<Kpi[]>("/kpis")
+    ]);
 
-      setEvaluations(evaluationResponse.data);
-      setEmployees(employeeResponse.data.items);
-      setKpis(kpiResponse.data);
-    } catch (loadError) {
-      setError(getApiErrorMessage(loadError, "Unable to load evaluation data."));
+    if (evaluationResult.status === "fulfilled") {
+      setEvaluations(evaluationResult.value.data);
+    } else {
+      setError(getApiErrorMessage(evaluationResult.reason, "Unable to load evaluations."));
+    }
+
+    if (employeeResult.status === "fulfilled") {
+      setEmployees(employeeResult.value.data.items);
+    } else {
+      setEmployees([]);
+      setEmployeeLoadError(getApiErrorMessage(employeeResult.reason, "Unable to load employees."));
+    }
+
+    if (kpiResult.status === "fulfilled") {
+      setKpis(kpiResult.value.data);
+    } else if (!error) {
+      setError(getApiErrorMessage(kpiResult.reason, "Unable to load KPI data."));
     }
   }
 
@@ -179,6 +197,7 @@ export function EvaluationPage() {
               <span className="mb-2 block text-sm font-medium text-slate-700">Employee</span>
               <select
                 className="input"
+                disabled={employees.length === 0}
                 value={form.employeeId}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -187,13 +206,27 @@ export function EvaluationPage() {
                   }))
                 }
               >
-                <option value="">Select employee</option>
+                <option value="">
+                  {employeeLoadError
+                    ? "Employees unavailable"
+                    : employees.length === 0
+                      ? "No employees available"
+                      : "Select employee"}
+                </option>
                 {employees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.fullName} | {employee.departmentName} | {employee.employeeCode}
                   </option>
                 ))}
               </select>
+              {employeeLoadError ? (
+                <p className="mt-2 text-sm text-rose-600">{employeeLoadError}</p>
+              ) : null}
+              {!employeeLoadError && employees.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  No employee records are available yet. Add an employee first, then return here.
+                </p>
+              ) : null}
             </label>
 
             <div className="grid gap-4 md:grid-cols-2">
