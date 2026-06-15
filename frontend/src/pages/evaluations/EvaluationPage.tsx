@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "../../components/common/PageHeader";
+import { useAuth } from "../../context/AuthContext";
 import { getResourceCompletionPercentage } from "../../data/resourceLibrary";
 import { api } from "../../lib/api";
 import { getApiErrorMessage } from "../../lib/getApiErrorMessage";
@@ -92,6 +93,7 @@ type SubmissionResult = {
 };
 
 export function EvaluationPage() {
+  const { session } = useAuth();
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [kpis, setKpis] = useState<Kpi[]>([]);
@@ -148,6 +150,19 @@ export function EvaluationPage() {
   useEffect(() => {
     void loadPageData();
   }, []);
+
+  useEffect(() => {
+    if (employees.length === 1) {
+      setForm((current) =>
+        current.employeeId
+          ? current
+          : {
+              ...current,
+              employeeId: String(employees[0].id)
+            }
+      );
+    }
+  }, [employees]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -221,6 +236,11 @@ export function EvaluationPage() {
               </select>
               {employeeLoadError ? (
                 <p className="mt-2 text-sm text-rose-600">{employeeLoadError}</p>
+              ) : null}
+              {session?.user.role === "employee" ? (
+                <p className="mt-2 text-sm text-rose-600">
+                  Your account role is `employee`, so you cannot run organization-wide evaluations or load the employee list here.
+                </p>
               ) : null}
               {!employeeLoadError && employees.length === 0 ? (
                 <p className="mt-2 text-sm text-slate-500">

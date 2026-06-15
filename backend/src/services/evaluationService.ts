@@ -15,6 +15,7 @@ import { ApiError } from "../utils/ApiError";
 import { validateEvaluationSubmissionInput } from "../validators/evaluationValidators";
 import {
   calculateSuggestedDueDate,
+  ensureLearningPathwayAssignments,
   getConfiguredDefaultPathwayDeadlineDays
 } from "./learningPathwayAssignmentService";
 import {
@@ -133,34 +134,44 @@ export async function createEvaluation(
       explanation
     });
 
-    for (const material of materials) {
-      await upsertLearningPathwayAssignment(connection, {
-        employeeId: input.employeeId,
-        resourceId: material.resourceId,
-        sourceEvaluationId: nextEvaluationId,
-        assignedBy: evaluator.id,
-        dueDate: calculateSuggestedDueDate(material, defaultDeadlineDays)
-      });
-    }
-
-    await createNotification(connection, {
-      userId: employee.userId,
-      category: "recommendation",
-      title: "New performance evaluation",
-      message: `A new evaluation was recorded on ${input.evaluationDate}. Review your feedback and recommendations in the portal.`
-    });
-
-    if (recommendationTypes.includes("warning")) {
-      await createNotification(connection, {
-        userId: evaluator.id,
-        category: "evaluation",
-        title: "Declining performance warning",
-        message: `${employee.fullName} has shown a decline across recent evaluations and may require intervention.`
-      });
-    }
-
     return nextEvaluationId;
   });
+
+  try {
+    await ensureLearningPathwayAssignments(
+      materials.map((material) => ({
+        employeeId: input.employeeId,
+        resourceId: material.resourceId,
+        sourceEvaluationId: evaluationId,
+        assignedBy: evaluator.id,
+        dueDate: calculateSuggestedDueDate(material, defaultDeadlineDays)
+      }))
+    );
+  } catch (error) {
+    console.error("Learning pathway assignment failed after evaluation creation:", error);
+  }
+
+  try {
+    await withTransaction(async (connection) => {
+      await createNotification(connection, {
+        userId: employee.userId,
+        category: "recommendation",
+        title: "New performance evaluation",
+        message: `A new evaluation was recorded on ${input.evaluationDate}. Review your feedback and recommendations in the portal.`
+      });
+
+      if (recommendationTypes.includes("warning")) {
+        await createNotification(connection, {
+          userId: evaluator.id,
+          category: "evaluation",
+          title: "Declining performance warning",
+          message: `${employee.fullName} has shown a decline across recent evaluations and may require intervention.`
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Evaluation notification dispatch failed after evaluation creation:", error);
+  }
 
   return {
     evaluationId,

@@ -38,6 +38,8 @@ export function errorHandler(
     });
   }
 
+  console.error("Unhandled server error:", error);
+
   return response.status(500).json({
     message: "An unexpected server error occurred."
   });
