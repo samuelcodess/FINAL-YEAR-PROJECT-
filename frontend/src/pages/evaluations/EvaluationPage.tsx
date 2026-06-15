@@ -97,6 +97,7 @@ export function EvaluationPage() {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [kpis, setKpis] = useState<Kpi[]>([]);
+  const [pageLoadError, setPageLoadError] = useState("");
   const [employeeLoadError, setEmployeeLoadError] = useState("");
   const [form, setForm] = useState({
     employeeId: "",
@@ -106,11 +107,11 @@ export function EvaluationPage() {
     remarks: "",
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [submissionError, setSubmissionError] = useState("");
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
 
   async function loadPageData() {
-    setError("");
+    setPageLoadError("");
     setEmployeeLoadError("");
 
     const [evaluationResult, employeeResult, kpiResult] = await Promise.allSettled([
@@ -130,7 +131,7 @@ export function EvaluationPage() {
     if (evaluationResult.status === "fulfilled") {
       setEvaluations(evaluationResult.value.data);
     } else {
-      setError(getApiErrorMessage(evaluationResult.reason, "Unable to load evaluations."));
+      setPageLoadError(getApiErrorMessage(evaluationResult.reason, "Unable to load evaluations."));
     }
 
     if (employeeResult.status === "fulfilled") {
@@ -142,8 +143,8 @@ export function EvaluationPage() {
 
     if (kpiResult.status === "fulfilled") {
       setKpis(kpiResult.value.data);
-    } else if (!error) {
-      setError(getApiErrorMessage(kpiResult.reason, "Unable to load KPI data."));
+    } else if (!pageLoadError) {
+      setPageLoadError(getApiErrorMessage(kpiResult.reason, "Unable to load KPI data."));
     }
   }
 
@@ -167,7 +168,7 @@ export function EvaluationPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setError("");
+    setSubmissionError("");
     setSubmissionResult(null);
 
     try {
@@ -190,7 +191,7 @@ export function EvaluationPage() {
       });
       await loadPageData();
     } catch (submissionError) {
-      setError(getApiErrorMessage(submissionError, "Unable to submit evaluation."));
+      setSubmissionError(getApiErrorMessage(submissionError, "Unable to submit evaluation."));
     } finally {
       setSaving(false);
     }
@@ -333,7 +334,7 @@ export function EvaluationPage() {
               />
             </label>
 
-            {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+            {submissionError ? <p className="text-sm text-rose-600">{submissionError}</p> : null}
             {submissionResult ? (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-950">
@@ -470,6 +471,7 @@ export function EvaluationPage() {
 
         <section className="panel p-6">
           <h2 className="text-xl font-semibold text-slate-950">Recent evaluations</h2>
+          {pageLoadError ? <p className="mt-2 text-sm text-slate-500">{pageLoadError}</p> : null}
           <div className="mt-6 space-y-4">
             {evaluations.map((evaluation) => (
               <article className="rounded-2xl border border-slate-200 p-4" key={evaluation.id}>
