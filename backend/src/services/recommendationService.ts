@@ -364,37 +364,56 @@ export async function listRecommendationsWithMaterials(input: {
   const recommendations = await listRecommendationsForRole(input);
 
   const employeeIds = [...new Set(recommendations.map((item) => Number(item.employeeId)))];
-  const materials = recommendations.flatMap((item) => {
+  const recommendationMaterials = recommendations.map((item) => {
     const recommendationType = item.recommendationType as RecommendationType;
     const focusAreas = item.focusAreas ?? [];
 
-    return buildSupportMaterials([recommendationType], focusAreas).map((material) => ({
+    return {
+      recommendationId: item.id,
+      employeeId: Number(item.employeeId),
+      evaluationId: item.evaluationId,
+      materials: buildSupportMaterials([recommendationType], focusAreas)
+    };
+  });
+  const materials = recommendationMaterials.flatMap((item) =>
+    item.materials.map((material) => ({
       employeeId: Number(item.employeeId),
       evaluationId: item.evaluationId,
       material
-    }));
-  });
-  const defaultDeadlineDays = await getConfiguredDefaultPathwayDeadlineDays();
-
-  await ensureLearningPathwayAssignments(
-    materials.map((item) => ({
-      employeeId: item.employeeId,
-      resourceId: item.material.resourceId,
-      sourceEvaluationId: item.evaluationId ?? null,
-      dueDate: calculateSuggestedDueDate(item.material, defaultDeadlineDays)
     }))
   );
-
+  const defaultDeadlineDays = await getConfiguredDefaultPathwayDeadlineDays();
   const resourceIds = [...new Set(materials.map((item) => item.material.resourceId))];
+  let assignmentMap = await listAssignmentMetadataForMaterials({
+    employeeIds,
+    resourceIds
+  });
+
+  const missingAssignments = materials.filter(
+    (item) => !assignmentMap.has(`${item.employeeId}:${item.material.resourceId}`)
+  );
+
+  if (missingAssignments.length > 0) {
+    await ensureLearningPathwayAssignments(
+      missingAssignments.map((item) => ({
+        employeeId: item.employeeId,
+        resourceId: item.material.resourceId,
+        sourceEvaluationId: item.evaluationId ?? null,
+        dueDate: calculateSuggestedDueDate(item.material, defaultDeadlineDays)
+      }))
+    );
+
+    assignmentMap = await listAssignmentMetadataForMaterials({
+      employeeIds,
+      resourceIds
+    });
+  }
+
   const progressRows = await listLearningPathwayProgress({
     employeeIds,
     resourceIds
   });
   const latestSubmissionRows = await listLatestLearningPathwaySubmissionSummaries({
-    employeeIds,
-    resourceIds
-  });
-  const assignmentMap = await listAssignmentMetadataForMaterials({
     employeeIds,
     resourceIds
   });
@@ -413,13 +432,13 @@ export async function listRecommendationsWithMaterials(input: {
   }
 
   return recommendations.map((item) => {
-    const recommendationType = item.recommendationType as RecommendationType;
-    const focusAreas = item.focusAreas ?? [];
     const employeeId = Number(item.employeeId);
+    const materialSet =
+      recommendationMaterials.find((entry) => entry.recommendationId === item.id)?.materials ?? [];
 
     return {
       ...item,
-      materials: buildSupportMaterials([recommendationType], focusAreas).map((material) => ({
+      materials: materialSet.map((material) => ({
         ...material,
         latestAiScore: latestSubmissionMap.get(`${employeeId}:${material.resourceId}`)?.aiScore ?? null,
         latestAiRecommendation:

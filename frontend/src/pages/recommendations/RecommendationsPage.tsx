@@ -225,80 +225,78 @@ export function RecommendationsPage() {
             {item.materials.length > 0 ? (
               <div className="mt-5 space-y-3">
                 <h3 className="text-sm font-semibold text-slate-900">Suggested learning pathways</h3>
-                {item.materials.map((material) => (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4" key={material.id}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-950">{material.title}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                          {material.targetArea} - {material.estimatedDuration} - {material.format}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            {getDecisionLabel(material.completionDecision)}
-                          </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            {material.dueDate ? `Due ${material.dueDate}` : "No deadline"}
-                          </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            {getSubmissionLabel(material.latestSubmissionStatus)}
-                          </span>
-                          {material.latestAiScore !== null ? (
-                            <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
-                              AI score {material.latestAiScore}
+                {item.materials.map((material) => {
+                  const progressPercentage = getResourceCompletionPercentage(
+                    material.resourceId,
+                    material.completedModuleIndexes
+                  );
+
+                  return (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4" key={material.id}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-slate-950">{material.title}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
+                            {material.targetArea} - {material.estimatedDuration} - {material.format}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+                            <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                              {getDecisionLabel(material.completionDecision)}
                             </span>
-                          ) : null}
-                          <span className={`rounded-full px-3 py-1 ${getResultTone(material.improvementDelta)}`}>
-                            {material.improvementDelta === null
-                              ? "No follow-up result yet"
-                              : `Result ${material.improvementDelta > 0 ? "+" : ""}${material.improvementDelta}`}
-                          </span>
+                            <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                              {material.dueDate ? `Due ${material.dueDate}` : "No deadline"}
+                            </span>
+                            <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                              {getSubmissionLabel(material.latestSubmissionStatus)}
+                            </span>
+                            {material.latestAiScore !== null ? (
+                              <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
+                                AI score {material.latestAiScore}
+                              </span>
+                            ) : null}
+                            <span className={`rounded-full px-3 py-1 ${getResultTone(material.improvementDelta)}`}>
+                              {material.improvementDelta === null
+                                ? "No follow-up result yet"
+                                : `Result ${material.improvementDelta > 0 ? "+" : ""}${material.improvementDelta}`}
+                            </span>
+                          </div>
+                        </div>
+                        <Link
+                          className="btn-secondary inline-flex"
+                          to={`${material.resourceUrl}?employeeId=${item.employeeId}`}
+                        >
+                          Open
+                        </Link>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                          <span>Progress</span>
+                          <span>{progressPercentage}%</span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-slate-200">
+                          <div
+                            className="h-2 rounded-full bg-brand-600 transition-all"
+                            style={{
+                              width: `${progressPercentage}%`
+                            }}
+                          />
                         </div>
                       </div>
-                      <Link
-                        className="btn-secondary inline-flex"
-                        to={`${material.resourceUrl}?employeeId=${item.employeeId}`}
-                      >
-                        Open
-                      </Link>
+                      {material.baselineScore !== null || material.followUpScore !== null || material.latestSubmissionUpdatedAt ? (
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+                          {material.baselineScore !== null || material.followUpScore !== null ? (
+                            <span>
+                              Baseline {material.baselineScore ?? "N/A"} | Follow-up {material.followUpScore ?? "N/A"}
+                            </span>
+                          ) : null}
+                          {material.latestSubmissionUpdatedAt ? (
+                            <span>Latest training activity {material.latestSubmissionUpdatedAt}</span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-                        <span>Progress</span>
-                        <span>
-                          {getResourceCompletionPercentage(
-                            material.resourceId,
-                            material.completedModuleIndexes
-                          )}
-                          %
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2 rounded-full bg-slate-200">
-                        <div
-                          className="h-2 rounded-full bg-brand-600 transition-all"
-                          style={{
-                            width: `${getResourceCompletionPercentage(
-                              material.resourceId,
-                              material.completedModuleIndexes
-                          )}%`
-                          }}
-                        />
-                      </div>
-                    </div>
-                    {(material.baselineScore !== null || material.followUpScore !== null || material.latestSubmissionUpdatedAt) ? (
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-                        {(material.baselineScore !== null || material.followUpScore !== null) ? (
-                          <span>
-                            Baseline {material.baselineScore ?? "N/A"} | Follow-up {material.followUpScore ?? "N/A"}
-                          </span>
-                        ) : null}
-                        {material.latestSubmissionUpdatedAt ? (
-                          <span>Latest training activity {material.latestSubmissionUpdatedAt}</span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : null}
           </article>
