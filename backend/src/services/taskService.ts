@@ -28,6 +28,7 @@ import {
 import type { AuthenticatedUser, TaskPriority, TaskStatus, TaskSubmissionStatus } from "../types/domain";
 import { ApiError } from "../utils/ApiError";
 import { validateTaskCreateInput, validateTaskUpdateInput } from "../validators/taskValidators";
+import { evaluateTaskSubmission } from "./taskAutoEvaluationService";
 
 const taskUploadDirectory = path.join(process.cwd(), "uploads", "tasks");
 const allowedAttachmentMimeTypes = new Set([
@@ -331,12 +332,24 @@ export async function submitTaskWork(
   }
 
   const employeeId = await resolveEmployeeIdForActor(actor);
+  const submittedAt = formatDateTimeForSql();
+  const autoEvaluation = evaluateTaskSubmission({
+    task,
+    submissionNote,
+    submittedAt,
+    attachmentCount: attachmentPayload ? 1 : 0
+  });
 
   await withTransaction(async (connection) => {
     const submissionId = await createTaskSubmission(connection, {
       taskId,
       employeeId,
-      submissionNote
+      submissionNote,
+      aiScore: autoEvaluation.aiScore,
+      aiFeedback: autoEvaluation.aiFeedback,
+      aiStrengths: autoEvaluation.aiStrengths,
+      aiImprovements: autoEvaluation.aiImprovements,
+      aiRecommendation: autoEvaluation.aiRecommendation
     });
 
     if (attachmentPayload) {
@@ -356,7 +369,7 @@ export async function submitTaskWork(
     await updateTaskStatus(connection, {
       taskId,
       status: "submitted",
-      submittedAt: formatDateTimeForSql(),
+      submittedAt,
       reviewedBy: null,
       reviewedAt: null,
       reviewComment: null
@@ -366,12 +379,12 @@ export async function submitTaskWork(
       userId: task.assignedBy,
       category: "task",
       title: "Task work submitted",
-      message: `${task.employeeName} submitted work for task "${task.title}".`
+      message: `${task.employeeName} submitted work for task "${task.title}". AI pre-review marked it as ${autoEvaluation.aiRecommendation.replace("_", " ")} with a score of ${autoEvaluation.aiScore}.`
     });
 
     await createActivityLog(connection, {
       userId: actor.id,
-      action: `Submitted work for task "${task.title}"${attachmentPayload ? " with attachment" : ""}.`
+      action: `Submitted work for task "${task.title}"${attachmentPayload ? " with attachment" : ""} and received AI pre-review score ${autoEvaluation.aiScore}.`
     });
   });
 

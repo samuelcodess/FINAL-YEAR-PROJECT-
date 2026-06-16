@@ -1,7 +1,7 @@
 import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
 
 import { pool } from "../database/pool";
-import type { TaskSubmissionStatus } from "../types/domain";
+import type { TaskSubmissionAiRecommendation, TaskSubmissionStatus } from "../types/domain";
 
 export type TaskSubmissionRow = {
   id: number;
@@ -9,6 +9,11 @@ export type TaskSubmissionRow = {
   employeeId: number;
   employeeName: string;
   submissionNote: string;
+  aiScore: number;
+  aiFeedback: string;
+  aiStrengths: string;
+  aiImprovements: string;
+  aiRecommendation: TaskSubmissionAiRecommendation;
   status: TaskSubmissionStatus;
   reviewComment: string | null;
   reviewedBy: number | null;
@@ -26,6 +31,11 @@ export async function listTaskSubmissions(taskId: number) {
        s.employee_id AS employeeId,
        employee_user.full_name AS employeeName,
        s.submission_note AS submissionNote,
+       s.ai_score AS aiScore,
+       s.ai_feedback AS aiFeedback,
+       s.ai_strengths AS aiStrengths,
+       s.ai_improvements AS aiImprovements,
+       s.ai_recommendation AS aiRecommendation,
        s.status,
        s.review_comment AS reviewComment,
        s.reviewed_by AS reviewedBy,
@@ -58,6 +68,11 @@ export async function listTaskSubmissionsForTaskIds(taskIds: number[]) {
        s.employee_id AS employeeId,
        employee_user.full_name AS employeeName,
        s.submission_note AS submissionNote,
+       s.ai_score AS aiScore,
+       s.ai_feedback AS aiFeedback,
+       s.ai_strengths AS aiStrengths,
+       s.ai_improvements AS aiImprovements,
+       s.ai_recommendation AS aiRecommendation,
        s.status,
        s.review_comment AS reviewComment,
        s.reviewed_by AS reviewedBy,
@@ -83,6 +98,11 @@ export async function createTaskSubmission(
     taskId: number;
     employeeId: number;
     submissionNote: string;
+    aiScore: number;
+    aiFeedback: string;
+    aiStrengths: string;
+    aiImprovements: string;
+    aiRecommendation: TaskSubmissionAiRecommendation;
   }
 ) {
   const [result] = await connection.execute<ResultSetHeader>(
@@ -90,9 +110,23 @@ export async function createTaskSubmission(
        task_id,
        employee_id,
        submission_note,
+       ai_score,
+       ai_feedback,
+       ai_strengths,
+       ai_improvements,
+       ai_recommendation,
        status
-     ) VALUES (?, ?, ?, 'submitted')`,
-    [input.taskId, input.employeeId, input.submissionNote]
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted')`,
+    [
+      input.taskId,
+      input.employeeId,
+      input.submissionNote,
+      input.aiScore,
+      input.aiFeedback,
+      input.aiStrengths,
+      input.aiImprovements,
+      input.aiRecommendation
+    ]
   );
 
   return result.insertId;
@@ -106,6 +140,11 @@ export async function findTaskSubmissionById(submissionId: number) {
        s.employee_id AS employeeId,
        employee_user.full_name AS employeeName,
        s.submission_note AS submissionNote,
+       s.ai_score AS aiScore,
+       s.ai_feedback AS aiFeedback,
+       s.ai_strengths AS aiStrengths,
+       s.ai_improvements AS aiImprovements,
+       s.ai_recommendation AS aiRecommendation,
        s.status,
        s.review_comment AS reviewComment,
        s.reviewed_by AS reviewedBy,

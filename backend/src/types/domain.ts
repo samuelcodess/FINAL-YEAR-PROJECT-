@@ -61,6 +61,7 @@ export type TaskStatus =
   | "needs_revision"
   | "cancelled";
 export type TaskSubmissionStatus = "submitted" | "approved" | "needs_revision";
+export type TaskSubmissionAiRecommendation = "ready_for_review" | "needs_revision";
 
 export type UserRecord = {
   id: number;

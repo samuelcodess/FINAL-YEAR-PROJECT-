@@ -45,6 +45,11 @@ type TaskDetail = {
     employeeId: number;
     employeeName: string;
     submissionNote: string;
+    aiScore: number;
+    aiFeedback: string;
+    aiStrengths: string;
+    aiImprovements: string;
+    aiRecommendation: "ready_for_review" | "needs_revision";
     status: TaskSubmissionStatus;
     reviewComment: string | null;
     reviewedBy: number | null;
@@ -426,6 +431,23 @@ export function TaskDetailPage() {
                   </div>
 
                   <p className="mt-4 text-sm leading-7 text-slate-700">{submission.submissionNote}</p>
+
+                  <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">AI pre-review</p>
+                      <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                        {submission.aiRecommendation.split("_").join(" ")}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-slate-950">Score: {submission.aiScore}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">{submission.aiFeedback}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <span className="font-medium text-slate-950">Strengths:</span> {submission.aiStrengths}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <span className="font-medium text-slate-950">Improvements:</span> {submission.aiImprovements}
+                    </p>
+                  </div>
 
                   {submission.attachments.length > 0 ? (
                     <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
