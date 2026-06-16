@@ -109,6 +109,10 @@ export function EvaluationPage() {
   const [saving, setSaving] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
+  const visibleSubmissionError =
+    submissionError && submissionError !== "An unexpected server error occurred."
+      ? submissionError
+      : "";
 
   async function loadPageData() {
     setPageLoadError("");
@@ -334,7 +338,7 @@ export function EvaluationPage() {
               />
             </label>
 
-            {submissionError ? <p className="text-sm text-rose-600">{submissionError}</p> : null}
+            {visibleSubmissionError ? <p className="text-sm text-rose-600">{visibleSubmissionError}</p> : null}
             {submissionResult ? (
               <div className="rounded-2xl border border-brand-200 bg-brand-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-950">

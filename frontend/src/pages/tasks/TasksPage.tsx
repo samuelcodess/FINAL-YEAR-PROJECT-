@@ -95,7 +95,9 @@ export function TasksPage() {
   const [view, setView] = useState<TaskView>("active");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [error, setError] = useState("");
+  const [pageLoadError, setPageLoadError] = useState("");
+  const [assignmentLoadError, setAssignmentLoadError] = useState("");
+  const [submissionError, setSubmissionError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -109,9 +111,13 @@ export function TasksPage() {
   const pageSize = 8;
   const canAssignTasks = session?.user.role === "admin" || session?.user.role === "hr_manager";
 
+  function resolveVisibleError(message: string, fallback: string) {
+    return message === "An unexpected server error occurred." ? fallback : message;
+  }
+
   async function loadTasks() {
     try {
-      setError("");
+      setPageLoadError("");
       const response = await api.get<{ items: TaskRow[]; total: number }>("/tasks", {
         params: {
           q: q || undefined,
@@ -124,7 +130,9 @@ export function TasksPage() {
       setTasks(response.data.items);
       setTotal(response.data.total);
     } catch (loadError) {
-      setError(getApiErrorMessage(loadError, "Unable to load tasks."));
+      setPageLoadError(
+        resolveVisibleError(getApiErrorMessage(loadError, "Unable to load tasks."), "Unable to load tasks right now.")
+      );
     }
   }
 
@@ -151,8 +159,9 @@ export function TasksPage() {
     }
 
     async function loadAssignmentData() {
-      try {
-        const [employeesResponse, kpisResponse] = await Promise.all([
+      setAssignmentLoadError("");
+
+      const [employeesResult, kpisResult] = await Promise.allSettled([
           api.get<{ items: EmployeeOption[] }>("/employees", {
             params: {
               page: 1,
@@ -162,10 +171,30 @@ export function TasksPage() {
           api.get<KpiOption[]>("/kpis")
         ]);
 
-        setEmployees(employeesResponse.data.items);
-        setKpis(kpisResponse.data);
-      } catch (loadError) {
-        setError(getApiErrorMessage(loadError, "Unable to load task assignment options."));
+      if (employeesResult.status === "fulfilled") {
+        setEmployees(employeesResult.value.data.items);
+      } else {
+        setEmployees([]);
+      }
+
+      if (kpisResult.status === "fulfilled") {
+        setKpis(kpisResult.value.data);
+      } else {
+        setKpis([]);
+      }
+
+      if (employeesResult.status === "rejected" && kpisResult.status === "rejected") {
+        setAssignmentLoadError("Unable to load task assignment options right now.");
+        return;
+      }
+
+      if (employeesResult.status === "rejected") {
+        setAssignmentLoadError("Employee options could not be loaded right now.");
+        return;
+      }
+
+      if (kpisResult.status === "rejected") {
+        setAssignmentLoadError("KPI options are temporarily unavailable. You can still assign a task without linking one.");
       }
     }
 
@@ -175,7 +204,7 @@ export function TasksPage() {
   async function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setError("");
+    setSubmissionError("");
     setSuccess("");
 
     try {
@@ -199,7 +228,12 @@ export function TasksPage() {
       setSuccess("Task assigned successfully.");
       await loadTasks();
     } catch (submissionError) {
-      setError(getApiErrorMessage(submissionError, "Unable to assign task."));
+      setSubmissionError(
+        resolveVisibleError(
+          getApiErrorMessage(submissionError, "Unable to assign task."),
+          "Task assignment could not be completed right now."
+        )
+      );
     } finally {
       setSaving(false);
     }
@@ -311,6 +345,10 @@ export function TasksPage() {
               </button>
             </div>
           </form>
+
+          {assignmentLoadError ? <p className="mt-4 text-sm text-amber-700">{assignmentLoadError}</p> : null}
+          {submissionError ? <p className="mt-4 text-sm text-rose-600">{submissionError}</p> : null}
+          {success ? <p className="mt-4 text-sm text-brand-700">{success}</p> : null}
         </section>
       ) : null}
 
@@ -392,8 +430,7 @@ export function TasksPage() {
         </button>
       </section>
 
-      {error ? <p className="mb-4 text-sm text-rose-600">{error}</p> : null}
-      {success ? <p className="mb-4 text-sm text-brand-700">{success}</p> : null}
+      {pageLoadError ? <p className="mb-4 text-sm text-rose-600">{pageLoadError}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tasks.map((task) => (

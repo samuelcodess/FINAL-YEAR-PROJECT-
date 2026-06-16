@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError";
 
 export function errorHandler(
   error: Error,
-  _request: Request,
+  request: Request,
   response: Response,
   _next: NextFunction
 ) {
@@ -38,7 +38,12 @@ export function errorHandler(
     });
   }
 
-  console.error("Unhandled server error:", error);
+  console.error("Unhandled server error:", {
+    method: request.method,
+    path: request.originalUrl,
+    userId: request.user?.id ?? null,
+    error
+  });
 
   return response.status(500).json({
     message: "An unexpected server error occurred."
