@@ -204,31 +204,49 @@ export async function createTaskSubmission(
     aiRecommendation: TaskSubmissionAiRecommendation;
   }
 ) {
-  const [result] = await connection.execute<ResultSetHeader>(
-    `INSERT INTO task_submissions (
-       task_id,
-       employee_id,
-       submission_note,
-       ai_score,
-       ai_feedback,
-       ai_strengths,
-       ai_improvements,
-       ai_recommendation,
-       status
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted')`,
-    [
-      input.taskId,
-      input.employeeId,
-      input.submissionNote,
-      input.aiScore,
-      input.aiFeedback,
-      input.aiStrengths,
-      input.aiImprovements,
-      input.aiRecommendation
-    ]
-  );
+  try {
+    const [result] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO task_submissions (
+         task_id,
+         employee_id,
+         submission_note,
+         ai_score,
+         ai_feedback,
+         ai_strengths,
+         ai_improvements,
+         ai_recommendation,
+         status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted')`,
+      [
+        input.taskId,
+        input.employeeId,
+        input.submissionNote,
+        input.aiScore,
+        input.aiFeedback,
+        input.aiStrengths,
+        input.aiImprovements,
+        input.aiRecommendation
+      ]
+    );
 
-  return result.insertId;
+    return result.insertId;
+  } catch (error) {
+    if (!isMissingAiTaskSubmissionColumnError(error)) {
+      throw error;
+    }
+
+    const [legacyResult] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO task_submissions (
+         task_id,
+         employee_id,
+         submission_note,
+         status
+       ) VALUES (?, ?, ?, 'submitted')`,
+      [input.taskId, input.employeeId, input.submissionNote]
+    );
+
+    return legacyResult.insertId;
+  }
 }
 
 export async function findTaskSubmissionById(submissionId: number) {
