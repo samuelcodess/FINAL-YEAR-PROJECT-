@@ -37,6 +37,11 @@ type RecommendationRow = {
   createdAt: string;
 };
 
+function isMissingEvaluationAiColumnError(error: unknown) {
+  const databaseError = error as { code?: string };
+  return databaseError?.code === "ER_BAD_FIELD_ERROR";
+}
+
 export async function listEvaluationsForRole(input: {
   role: string;
   userId: number;
@@ -50,32 +55,67 @@ export async function listEvaluationsForRole(input: {
     params.push(input.employeeId ?? -1);
   }
 
-  const [rows] = await pool.query(
-    `SELECT
-       ev.id,
-       ev.employee_id AS employeeId,
-       ev.evaluator_id AS evaluatorId,
-       DATE_FORMAT(ev.evaluation_date, '%Y-%m-%d') AS evaluationDate,
-       ev.total_score AS totalScore,
-       ev.performance_level AS performanceLevel,
-       ev.recommendation,
-       ev.remarks,
-       ev.source_summary AS evidence,
-       ev.ai_summary AS aiSummary,
-       ev.evaluation_mode AS evaluationMode,
-       ev.trend,
-       u.full_name AS employeeName,
-       d.department_name AS departmentName
-     FROM evaluations ev
-     INNER JOIN employees e ON e.id = ev.employee_id
-     INNER JOIN users u ON u.id = e.user_id
-     INNER JOIN departments d ON d.id = e.department_id
-     ${whereClause}
-     ORDER BY ev.evaluation_date DESC, ev.id DESC`,
-    params
-  );
+  let evaluations: EvaluationListRow[] = [];
 
-  const evaluations = rows as EvaluationListRow[];
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         ev.id,
+         ev.employee_id AS employeeId,
+         ev.evaluator_id AS evaluatorId,
+         DATE_FORMAT(ev.evaluation_date, '%Y-%m-%d') AS evaluationDate,
+         ev.total_score AS totalScore,
+         ev.performance_level AS performanceLevel,
+         ev.recommendation,
+         ev.remarks,
+         ev.source_summary AS evidence,
+         ev.ai_summary AS aiSummary,
+         ev.evaluation_mode AS evaluationMode,
+         ev.trend,
+         u.full_name AS employeeName,
+         d.department_name AS departmentName
+       FROM evaluations ev
+       INNER JOIN employees e ON e.id = ev.employee_id
+       INNER JOIN users u ON u.id = e.user_id
+       INNER JOIN departments d ON d.id = e.department_id
+       ${whereClause}
+       ORDER BY ev.evaluation_date DESC, ev.id DESC`,
+      params
+    );
+
+    evaluations = rows as EvaluationListRow[];
+  } catch (error) {
+    if (!isMissingEvaluationAiColumnError(error)) {
+      throw error;
+    }
+
+    const [legacyRows] = await pool.query(
+      `SELECT
+         ev.id,
+         ev.employee_id AS employeeId,
+         ev.evaluator_id AS evaluatorId,
+         DATE_FORMAT(ev.evaluation_date, '%Y-%m-%d') AS evaluationDate,
+         ev.total_score AS totalScore,
+         ev.performance_level AS performanceLevel,
+         ev.recommendation,
+         ev.remarks,
+         ev.remarks AS evidence,
+         NULL AS aiSummary,
+         'manual' AS evaluationMode,
+         ev.trend,
+         u.full_name AS employeeName,
+         d.department_name AS departmentName
+       FROM evaluations ev
+       INNER JOIN employees e ON e.id = ev.employee_id
+       INNER JOIN users u ON u.id = e.user_id
+       INNER JOIN departments d ON d.id = e.department_id
+       ${whereClause}
+       ORDER BY ev.evaluation_date DESC, ev.id DESC`,
+      params
+    );
+
+    evaluations = legacyRows as EvaluationListRow[];
+  }
 
   if (evaluations.length === 0) {
     return [];
@@ -152,36 +192,67 @@ export async function createEvaluationRecord(
     trend: Trend;
   }
 ) {
-  const [result] = await connection.execute<ResultSetHeader>(
-    `INSERT INTO evaluations (
-       employee_id,
-       evaluator_id,
-       evaluation_date,
-       total_score,
-       performance_level,
-       recommendation,
-       remarks,
-       source_summary,
-       ai_summary,
-       evaluation_mode,
-       trend
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      input.employeeId,
-      input.evaluatorId,
-      input.evaluationDate,
-      input.totalScore,
-      input.performanceLevel,
-      input.recommendation,
-      input.remarks,
-      input.evidence,
-      input.aiSummary,
-      input.evaluationMode,
-      input.trend
-    ]
-  );
+  try {
+    const [result] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO evaluations (
+         employee_id,
+         evaluator_id,
+         evaluation_date,
+         total_score,
+         performance_level,
+         recommendation,
+         remarks,
+         source_summary,
+         ai_summary,
+         evaluation_mode,
+         trend
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.employeeId,
+        input.evaluatorId,
+        input.evaluationDate,
+        input.totalScore,
+        input.performanceLevel,
+        input.recommendation,
+        input.remarks,
+        input.evidence,
+        input.aiSummary,
+        input.evaluationMode,
+        input.trend
+      ]
+    );
 
-  return result.insertId;
+    return result.insertId;
+  } catch (error) {
+    if (!isMissingEvaluationAiColumnError(error)) {
+      throw error;
+    }
+
+    const [legacyResult] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO evaluations (
+         employee_id,
+         evaluator_id,
+         evaluation_date,
+         total_score,
+         performance_level,
+         recommendation,
+         remarks,
+         trend
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.employeeId,
+        input.evaluatorId,
+        input.evaluationDate,
+        input.totalScore,
+        input.performanceLevel,
+        input.recommendation,
+        input.remarks,
+        input.trend
+      ]
+    );
+
+    return legacyResult.insertId;
+  }
 }
 
 export async function insertEvaluationDetails(
