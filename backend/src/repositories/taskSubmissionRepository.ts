@@ -23,36 +23,97 @@ export type TaskSubmissionRow = {
   updatedAt: string;
 };
 
-export async function listTaskSubmissions(taskId: number) {
-  const [rows] = await pool.query(
-    `SELECT
-       s.id,
-       s.task_id AS taskId,
-       s.employee_id AS employeeId,
-       employee_user.full_name AS employeeName,
-       s.submission_note AS submissionNote,
-       s.ai_score AS aiScore,
-       s.ai_feedback AS aiFeedback,
-       s.ai_strengths AS aiStrengths,
-       s.ai_improvements AS aiImprovements,
-       s.ai_recommendation AS aiRecommendation,
-       s.status,
-       s.review_comment AS reviewComment,
-       s.reviewed_by AS reviewedBy,
-       reviewer.full_name AS reviewedByName,
-       DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
-       DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
-       DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
-     FROM task_submissions s
-     INNER JOIN employees e ON e.id = s.employee_id
-     INNER JOIN users employee_user ON employee_user.id = e.user_id
-     LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
-     WHERE s.task_id = ?
-     ORDER BY s.created_at DESC, s.id DESC`,
-    [taskId]
-  );
+function isMissingAiTaskSubmissionColumnError(error: unknown) {
+  const databaseError = error as { code?: string };
+  return databaseError?.code === "ER_BAD_FIELD_ERROR";
+}
 
-  return rows as TaskSubmissionRow[];
+function withLegacyAiDefaults(
+  rows: Array<
+    Omit<
+      TaskSubmissionRow,
+      "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+    >
+  >
+) {
+  return rows.map((row) => ({
+    ...row,
+    aiScore: 0,
+    aiFeedback: "",
+    aiStrengths: "",
+    aiImprovements: "",
+    aiRecommendation: "needs_revision" as TaskSubmissionAiRecommendation
+  }));
+}
+
+export async function listTaskSubmissions(taskId: number) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         s.id,
+         s.task_id AS taskId,
+         s.employee_id AS employeeId,
+         employee_user.full_name AS employeeName,
+         s.submission_note AS submissionNote,
+         s.ai_score AS aiScore,
+         s.ai_feedback AS aiFeedback,
+         s.ai_strengths AS aiStrengths,
+         s.ai_improvements AS aiImprovements,
+         s.ai_recommendation AS aiRecommendation,
+         s.status,
+         s.review_comment AS reviewComment,
+         s.reviewed_by AS reviewedBy,
+         reviewer.full_name AS reviewedByName,
+         DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+         DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+         DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+       FROM task_submissions s
+       INNER JOIN employees e ON e.id = s.employee_id
+       INNER JOIN users employee_user ON employee_user.id = e.user_id
+       LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+       WHERE s.task_id = ?
+       ORDER BY s.created_at DESC, s.id DESC`,
+      [taskId]
+    );
+
+    return rows as TaskSubmissionRow[];
+  } catch (error) {
+    if (!isMissingAiTaskSubmissionColumnError(error)) {
+      throw error;
+    }
+
+    const [legacyRows] = await pool.query(
+      `SELECT
+         s.id,
+         s.task_id AS taskId,
+         s.employee_id AS employeeId,
+         employee_user.full_name AS employeeName,
+         s.submission_note AS submissionNote,
+         s.status,
+         s.review_comment AS reviewComment,
+         s.reviewed_by AS reviewedBy,
+         reviewer.full_name AS reviewedByName,
+         DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+         DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+         DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+       FROM task_submissions s
+       INNER JOIN employees e ON e.id = s.employee_id
+       INNER JOIN users employee_user ON employee_user.id = e.user_id
+       LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+       WHERE s.task_id = ?
+       ORDER BY s.created_at DESC, s.id DESC`,
+      [taskId]
+    );
+
+    return withLegacyAiDefaults(
+      legacyRows as Array<
+        Omit<
+          TaskSubmissionRow,
+          "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+        >
+      >
+    );
+  }
 }
 
 export async function listTaskSubmissionsForTaskIds(taskIds: number[]) {
@@ -61,35 +122,73 @@ export async function listTaskSubmissionsForTaskIds(taskIds: number[]) {
   }
 
   const placeholders = taskIds.map(() => "?").join(", ");
-  const [rows] = await pool.query(
-    `SELECT
-       s.id,
-       s.task_id AS taskId,
-       s.employee_id AS employeeId,
-       employee_user.full_name AS employeeName,
-       s.submission_note AS submissionNote,
-       s.ai_score AS aiScore,
-       s.ai_feedback AS aiFeedback,
-       s.ai_strengths AS aiStrengths,
-       s.ai_improvements AS aiImprovements,
-       s.ai_recommendation AS aiRecommendation,
-       s.status,
-       s.review_comment AS reviewComment,
-       s.reviewed_by AS reviewedBy,
-       reviewer.full_name AS reviewedByName,
-       DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
-       DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
-       DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
-     FROM task_submissions s
-     INNER JOIN employees e ON e.id = s.employee_id
-     INNER JOIN users employee_user ON employee_user.id = e.user_id
-     LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
-     WHERE s.task_id IN (${placeholders})
-     ORDER BY s.created_at DESC, s.id DESC`,
-    taskIds
-  );
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         s.id,
+         s.task_id AS taskId,
+         s.employee_id AS employeeId,
+         employee_user.full_name AS employeeName,
+         s.submission_note AS submissionNote,
+         s.ai_score AS aiScore,
+         s.ai_feedback AS aiFeedback,
+         s.ai_strengths AS aiStrengths,
+         s.ai_improvements AS aiImprovements,
+         s.ai_recommendation AS aiRecommendation,
+         s.status,
+         s.review_comment AS reviewComment,
+         s.reviewed_by AS reviewedBy,
+         reviewer.full_name AS reviewedByName,
+         DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+         DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+         DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+       FROM task_submissions s
+       INNER JOIN employees e ON e.id = s.employee_id
+       INNER JOIN users employee_user ON employee_user.id = e.user_id
+       LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+       WHERE s.task_id IN (${placeholders})
+       ORDER BY s.created_at DESC, s.id DESC`,
+      taskIds
+    );
 
-  return rows as TaskSubmissionRow[];
+    return rows as TaskSubmissionRow[];
+  } catch (error) {
+    if (!isMissingAiTaskSubmissionColumnError(error)) {
+      throw error;
+    }
+
+    const [legacyRows] = await pool.query(
+      `SELECT
+         s.id,
+         s.task_id AS taskId,
+         s.employee_id AS employeeId,
+         employee_user.full_name AS employeeName,
+         s.submission_note AS submissionNote,
+         s.status,
+         s.review_comment AS reviewComment,
+         s.reviewed_by AS reviewedBy,
+         reviewer.full_name AS reviewedByName,
+         DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+         DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+         DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+       FROM task_submissions s
+       INNER JOIN employees e ON e.id = s.employee_id
+       INNER JOIN users employee_user ON employee_user.id = e.user_id
+       LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+       WHERE s.task_id IN (${placeholders})
+       ORDER BY s.created_at DESC, s.id DESC`,
+      taskIds
+    );
+
+    return withLegacyAiDefaults(
+      legacyRows as Array<
+        Omit<
+          TaskSubmissionRow,
+          "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+        >
+      >
+    );
+  }
 }
 
 export async function createTaskSubmission(
@@ -133,34 +232,73 @@ export async function createTaskSubmission(
 }
 
 export async function findTaskSubmissionById(submissionId: number) {
-  const [rows] = await pool.query(
-    `SELECT
-       s.id,
-       s.task_id AS taskId,
-       s.employee_id AS employeeId,
-       employee_user.full_name AS employeeName,
-       s.submission_note AS submissionNote,
-       s.ai_score AS aiScore,
-       s.ai_feedback AS aiFeedback,
-       s.ai_strengths AS aiStrengths,
-       s.ai_improvements AS aiImprovements,
-       s.ai_recommendation AS aiRecommendation,
-       s.status,
-       s.review_comment AS reviewComment,
-       s.reviewed_by AS reviewedBy,
-       reviewer.full_name AS reviewedByName,
-       DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
-       DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
-       DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
-     FROM task_submissions s
-     INNER JOIN employees e ON e.id = s.employee_id
-     INNER JOIN users employee_user ON employee_user.id = e.user_id
-     LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
-     WHERE s.id = ?`,
-    [submissionId]
-  );
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         s.id,
+         s.task_id AS taskId,
+         s.employee_id AS employeeId,
+         employee_user.full_name AS employeeName,
+         s.submission_note AS submissionNote,
+         s.ai_score AS aiScore,
+         s.ai_feedback AS aiFeedback,
+         s.ai_strengths AS aiStrengths,
+         s.ai_improvements AS aiImprovements,
+         s.ai_recommendation AS aiRecommendation,
+         s.status,
+         s.review_comment AS reviewComment,
+         s.reviewed_by AS reviewedBy,
+         reviewer.full_name AS reviewedByName,
+         DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+         DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+         DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+       FROM task_submissions s
+       INNER JOIN employees e ON e.id = s.employee_id
+       INNER JOIN users employee_user ON employee_user.id = e.user_id
+       LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+       WHERE s.id = ?`,
+      [submissionId]
+    );
 
-  return (rows as TaskSubmissionRow[])[0] ?? null;
+    return (rows as TaskSubmissionRow[])[0] ?? null;
+  } catch (error) {
+    if (!isMissingAiTaskSubmissionColumnError(error)) {
+      throw error;
+    }
+
+    const [legacyRows] = await pool.query(
+      `SELECT
+         s.id,
+         s.task_id AS taskId,
+         s.employee_id AS employeeId,
+         employee_user.full_name AS employeeName,
+         s.submission_note AS submissionNote,
+         s.status,
+         s.review_comment AS reviewComment,
+         s.reviewed_by AS reviewedBy,
+         reviewer.full_name AS reviewedByName,
+         DATE_FORMAT(s.reviewed_at, '%Y-%m-%d %H:%i:%s') AS reviewedAt,
+         DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+         DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+       FROM task_submissions s
+       INNER JOIN employees e ON e.id = s.employee_id
+       INNER JOIN users employee_user ON employee_user.id = e.user_id
+       LEFT JOIN users reviewer ON reviewer.id = s.reviewed_by
+       WHERE s.id = ?`,
+      [submissionId]
+    );
+
+    return (
+      withLegacyAiDefaults(
+        legacyRows as Array<
+          Omit<
+            TaskSubmissionRow,
+            "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+          >
+        >
+      )[0] ?? null
+    );
+  }
 }
 
 export async function updateTaskSubmissionReview(
