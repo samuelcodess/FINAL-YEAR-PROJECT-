@@ -8,8 +8,41 @@ export type EvaluationSubmissionInput = {
   periodEndDate: string;
 };
 
-function isValidDate(value: string) {
-  return !Number.isNaN(Date.parse(value));
+function normalizeDateInput(value: string) {
+  const trimmed = value.trim();
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    const candidate = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+
+    if (
+      candidate.getUTCFullYear() === Number(year) &&
+      candidate.getUTCMonth() + 1 === Number(month) &&
+      candidate.getUTCDate() === Number(day)
+    ) {
+      return `${year}-${month}-${day}`;
+    }
+
+    return null;
+  }
+
+  const slashMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    const candidate = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+
+    if (
+      candidate.getUTCFullYear() === Number(year) &&
+      candidate.getUTCMonth() + 1 === Number(month) &&
+      candidate.getUTCDate() === Number(day)
+    ) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  return null;
 }
 
 export function validateEvaluationSubmissionInput(
@@ -19,35 +52,35 @@ export function validateEvaluationSubmissionInput(
     throw new ApiError(400, "A valid employee is required.");
   }
 
-  if (!input.evaluationDate || !isValidDate(input.evaluationDate)) {
+  const evaluationDate = input.evaluationDate ? normalizeDateInput(input.evaluationDate) : null;
+  const periodStartDate = input.periodStartDate ? normalizeDateInput(input.periodStartDate) : null;
+  const periodEndDate = input.periodEndDate ? normalizeDateInput(input.periodEndDate) : null;
+
+  if (!evaluationDate) {
     throw new ApiError(400, "A valid evaluation date is required.");
   }
 
-  if (!input.periodStartDate || !isValidDate(input.periodStartDate)) {
+  if (!periodStartDate) {
     throw new ApiError(400, "A valid period start date is required.");
   }
 
-  if (!input.periodEndDate || !isValidDate(input.periodEndDate)) {
+  if (!periodEndDate) {
     throw new ApiError(400, "A valid period end date is required.");
   }
 
-  const periodStartTime = new Date(input.periodStartDate).getTime();
-  const periodEndTime = new Date(input.periodEndDate).getTime();
-  const evaluationTime = new Date(input.evaluationDate).getTime();
-
-  if (periodStartTime > periodEndTime) {
+  if (periodStartDate > periodEndDate) {
     throw new ApiError(400, "The period start date must be on or before the period end date.");
   }
 
-  if (periodEndTime > evaluationTime) {
+  if (periodEndDate > evaluationDate) {
     throw new ApiError(400, "The evaluation date must be on or after the period end date.");
   }
 
   return {
     employeeId: Number(input.employeeId),
-    evaluationDate: input.evaluationDate,
+    evaluationDate,
     remarks: input.remarks?.trim() ?? "",
-    periodStartDate: input.periodStartDate,
-    periodEndDate: input.periodEndDate
+    periodStartDate,
+    periodEndDate
   };
 }
