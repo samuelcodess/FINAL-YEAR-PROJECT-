@@ -15,6 +15,7 @@ import {
   listAssignmentMetadataForMaterials
 } from "./learningPathwayAssignmentService";
 import { listLearningPathwayProgress } from "../repositories/learningPathwayProgressRepository";
+import { listLatestLearningPathwaySubmissionSummaries } from "../repositories/learningPathwaySubmissionRepository";
 import { listRecommendationsForRole } from "../repositories/recommendationRepository";
 
 function roundScore(value: number) {
@@ -389,17 +390,26 @@ export async function listRecommendationsWithMaterials(input: {
     employeeIds,
     resourceIds
   });
+  const latestSubmissionRows = await listLatestLearningPathwaySubmissionSummaries({
+    employeeIds,
+    resourceIds
+  });
   const assignmentMap = await listAssignmentMetadataForMaterials({
     employeeIds,
     resourceIds
   });
   const progressMap = new Map<string, number[]>();
+  const latestSubmissionMap = new Map<string, (typeof latestSubmissionRows)[number]>();
 
   for (const row of progressRows) {
     const key = `${row.employeeId}:${row.resourceId}`;
     const current = progressMap.get(key) ?? [];
     current.push(Number(row.moduleIndex));
     progressMap.set(key, current);
+  }
+
+  for (const row of latestSubmissionRows) {
+    latestSubmissionMap.set(`${row.employeeId}:${row.resourceId}`, row);
   }
 
   return recommendations.map((item) => {
@@ -411,6 +421,13 @@ export async function listRecommendationsWithMaterials(input: {
       ...item,
       materials: buildSupportMaterials([recommendationType], focusAreas).map((material) => ({
         ...material,
+        latestAiScore: latestSubmissionMap.get(`${employeeId}:${material.resourceId}`)?.aiScore ?? null,
+        latestAiRecommendation:
+          latestSubmissionMap.get(`${employeeId}:${material.resourceId}`)?.aiRecommendation ?? null,
+        latestSubmissionStatus:
+          latestSubmissionMap.get(`${employeeId}:${material.resourceId}`)?.status ?? null,
+        latestSubmissionUpdatedAt:
+          latestSubmissionMap.get(`${employeeId}:${material.resourceId}`)?.updatedAt ?? null,
         completedModuleIndexes: progressMap.get(`${employeeId}:${material.resourceId}`) ?? [],
         assignmentId: assignmentMap.get(`${employeeId}:${material.resourceId}`)?.id ?? null,
         assignedAt: assignmentMap.get(`${employeeId}:${material.resourceId}`)?.assignedAt ?? null,

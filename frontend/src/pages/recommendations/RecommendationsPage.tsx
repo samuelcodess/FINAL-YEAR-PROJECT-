@@ -31,7 +31,13 @@ type Recommendation = {
     assignedAt: string | null;
     dueDate: string | null;
     completionDecision: "in_progress" | "completed" | "follow_up_required";
+    latestAiScore: number | null;
+    latestAiRecommendation: "ready_for_review" | "needs_revision" | null;
+    latestSubmissionStatus: "submitted" | "approved" | "needs_revision" | null;
+    latestSubmissionUpdatedAt: string | null;
     improvementDelta: number | null;
+    baselineScore?: number | null;
+    followUpScore?: number | null;
   }>;
 };
 type RecommendationView = "active" | "history";
@@ -54,6 +60,30 @@ function truncateText(value: string, maxLength: number) {
   }
 
   return `${value.slice(0, maxLength).trimEnd()}...`;
+}
+
+function getResultTone(delta: number | null) {
+  if (delta === null) {
+    return "bg-slate-100 text-slate-600";
+  }
+
+  if (delta > 0) {
+    return "bg-emerald-50 text-emerald-700";
+  }
+
+  if (delta < 0) {
+    return "bg-amber-50 text-amber-700";
+  }
+
+  return "bg-sky-50 text-sky-700";
+}
+
+function getSubmissionLabel(status: "submitted" | "approved" | "needs_revision" | null) {
+  if (!status) {
+    return "No submission yet";
+  }
+
+  return status.split("_").join(" ");
 }
 
 function splitRecommendationsByCompletion(recommendations: Recommendation[]) {
@@ -157,17 +187,24 @@ export function RecommendationsPage() {
 
       {error ? <p className="mb-4 text-sm text-rose-600">{error}</p> : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="space-y-4">
         {visibleRecommendations.map((item) => (
           <article className="panel p-6" key={item.id}>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
-              {item.recommendationType.split("_").join(" ")}
-            </span>
-            <p className="mt-3 text-sm font-semibold text-slate-900">{item.employeeName}</p>
-            <p className="mt-4 text-sm leading-7 text-slate-500">{truncateText(item.explanation, 150)}</p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
+                  {item.recommendationType.split("_").join(" ")}
+                </span>
+                <p className="mt-3 text-base font-semibold text-slate-950">{item.employeeName}</p>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-500">{truncateText(item.explanation, 120)}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-right">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pathways</p>
+                <p className="mt-1 text-2xl font-bold text-slate-950">{item.materials.length}</p>
+              </div>
+            </div>
             {item.focusAreas.length > 0 ? (
               <div className="mt-4">
-                <h3 className="text-sm font-semibold text-slate-900">Focus areas</h3>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {item.focusAreas.slice(0, 2).map((area) => (
                     <span
@@ -191,15 +228,39 @@ export function RecommendationsPage() {
                 {item.materials.map((material) => (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4" key={material.id}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-slate-950">{material.title}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                          {material.targetArea} - {material.estimatedDuration}
+                          {material.targetArea} - {material.estimatedDuration} - {material.format}
                         </p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                            {getDecisionLabel(material.completionDecision)}
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                            {material.dueDate ? `Due ${material.dueDate}` : "No deadline"}
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                            {getSubmissionLabel(material.latestSubmissionStatus)}
+                          </span>
+                          {material.latestAiScore !== null ? (
+                            <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
+                              AI score {material.latestAiScore}
+                            </span>
+                          ) : null}
+                          <span className={`rounded-full px-3 py-1 ${getResultTone(material.improvementDelta)}`}>
+                            {material.improvementDelta === null
+                              ? "No follow-up result yet"
+                              : `Result ${material.improvementDelta > 0 ? "+" : ""}${material.improvementDelta}`}
+                          </span>
+                        </div>
                       </div>
-                      <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-600">
-                        {getDecisionLabel(material.completionDecision)}
-                      </span>
+                      <Link
+                        className="btn-secondary inline-flex"
+                        to={`${material.resourceUrl}?employeeId=${item.employeeId}`}
+                      >
+                        Open
+                      </Link>
                     </div>
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs font-medium text-slate-500">
@@ -219,21 +280,23 @@ export function RecommendationsPage() {
                             width: `${getResourceCompletionPercentage(
                               material.resourceId,
                               material.completedModuleIndexes
-                            )}%`
+                          )}%`
                           }}
                         />
                       </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500">
-                      <span>{material.format}</span>
-                      <span>Deadline: {material.dueDate ?? "Not set"}</span>
-                    </div>
-                    <Link
-                      className="btn-secondary mt-3 inline-flex"
-                      to={`${material.resourceUrl}?employeeId=${item.employeeId}`}
-                    >
-                      Open details
-                    </Link>
+                    {(material.baselineScore !== null || material.followUpScore !== null || material.latestSubmissionUpdatedAt) ? (
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+                        {(material.baselineScore !== null || material.followUpScore !== null) ? (
+                          <span>
+                            Baseline {material.baselineScore ?? "N/A"} | Follow-up {material.followUpScore ?? "N/A"}
+                          </span>
+                        ) : null}
+                        {material.latestSubmissionUpdatedAt ? (
+                          <span>Latest training activity {material.latestSubmissionUpdatedAt}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

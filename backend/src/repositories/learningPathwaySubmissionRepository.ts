@@ -29,6 +29,15 @@ export type LearningPathwaySubmissionRow = {
   updatedAt: string;
 };
 
+export type LearningPathwayLatestSubmissionSummaryRow = {
+  employeeId: number;
+  resourceId: string;
+  aiScore: number;
+  aiRecommendation: LearningPathwayAiRecommendation;
+  status: LearningPathwaySubmissionStatus;
+  updatedAt: string;
+};
+
 export async function listLearningPathwaySubmissions(input: {
   employeeId: number;
   resourceId: string;
@@ -64,6 +73,45 @@ export async function listLearningPathwaySubmissions(input: {
   );
 
   return rows as LearningPathwaySubmissionRow[];
+}
+
+export async function listLatestLearningPathwaySubmissionSummaries(input: {
+  employeeIds: number[];
+  resourceIds: string[];
+}) {
+  if (input.employeeIds.length === 0 || input.resourceIds.length === 0) {
+    return [] as LearningPathwayLatestSubmissionSummaryRow[];
+  }
+
+  const employeePlaceholders = input.employeeIds.map(() => "?").join(", ");
+  const resourcePlaceholders = input.resourceIds.map(() => "?").join(", ");
+
+  const [rows] = await pool.query(
+    `SELECT
+       s.employee_id AS employeeId,
+       s.resource_id AS resourceId,
+       s.ai_score AS aiScore,
+       s.ai_recommendation AS aiRecommendation,
+       s.status,
+       DATE_FORMAT(s.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+     FROM learning_pathway_submissions s
+     WHERE s.employee_id IN (${employeePlaceholders})
+       AND s.resource_id IN (${resourcePlaceholders})
+     ORDER BY s.employee_id ASC, s.resource_id ASC, s.updated_at DESC, s.id DESC`,
+    [...input.employeeIds, ...input.resourceIds]
+  );
+
+  const latestByKey = new Map<string, LearningPathwayLatestSubmissionSummaryRow>();
+
+  for (const row of rows as LearningPathwayLatestSubmissionSummaryRow[]) {
+    const key = `${row.employeeId}:${row.resourceId}`;
+
+    if (!latestByKey.has(key)) {
+      latestByKey.set(key, row);
+    }
+  }
+
+  return [...latestByKey.values()];
 }
 
 export async function createLearningPathwaySubmission(
