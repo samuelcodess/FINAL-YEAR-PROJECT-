@@ -1,9 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 
 import { PageHeader } from "../../components/common/PageHeader";
 import { useAuth } from "../../context/AuthContext";
-import { getResourceCompletionPercentage } from "../../data/resourceLibrary";
 import { api } from "../../lib/api";
 import { getApiErrorMessage } from "../../lib/getApiErrorMessage";
 
@@ -417,49 +415,6 @@ export function EvaluationPage() {
                     {submissionResult.taskHighlights.map((highlight, index) => (
                       <div className="rounded-2xl border border-brand-200 bg-white/70 p-3" key={`${index}-${highlight.slice(0, 24)}`}>
                         <p className="text-sm leading-6 text-slate-600">{highlight}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {submissionResult.materials.length > 0 ? (
-                  <div className="mt-4 space-y-2">
-                    <p className="font-semibold text-slate-950">Recommended learning pathways</p>
-                    {submissionResult.materials.map((material) => (
-                      <div className="rounded-2xl border border-brand-200 bg-white/70 p-3" key={material.id}>
-                        <p className="font-medium text-slate-950">{material.title}</p>
-                        <p className="mt-1 text-sm text-slate-600">{material.description}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                          {material.targetArea} - {material.estimatedDuration} - {material.actionType}
-                        </p>
-                        <div className="mt-2">
-                          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-                            <span>Progress</span>
-                            <span>
-                              {getResourceCompletionPercentage(
-                                material.resourceId,
-                                material.completedModuleIndexes
-                              )}
-                              %
-                            </span>
-                          </div>
-                          <div className="mt-2 h-2 rounded-full bg-slate-200">
-                            <div
-                              className="h-2 rounded-full bg-brand-600 transition-all"
-                              style={{
-                                width: `${getResourceCompletionPercentage(
-                                  material.resourceId,
-                                  material.completedModuleIndexes
-                                )}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <Link
-                          className="mt-3 inline-flex text-sm font-medium text-brand-700"
-                          to={`${material.resourceUrl}?employeeId=${submissionResult.employeeId}`}
-                        >
-                          Open pathway and assign evidence work
-                        </Link>
                       </div>
                     ))}
                   </div>
