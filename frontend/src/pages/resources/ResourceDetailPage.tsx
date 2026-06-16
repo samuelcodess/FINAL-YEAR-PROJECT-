@@ -27,6 +27,7 @@ type ProgressResponse = {
 type SubmissionStatus = "submitted" | "approved" | "needs_revision";
 type SubmissionType = "module" | "final_assignment";
 type CompletionDecision = "in_progress" | "completed" | "follow_up_required";
+type PathwayPane = "overview" | "coursework" | "management";
 
 type ReviewHistoryRecord = {
   id: number;
@@ -363,6 +364,14 @@ export function ResourceDetailPage() {
   const [decisionDraft, setDecisionDraft] = useState<CompletionDecision>("in_progress");
   const [decisionCommentDraft, setDecisionCommentDraft] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
+  const [activePane, setActivePane] = useState<PathwayPane>(
+    session?.user.role === "employee"
+      ? "coursework"
+      : session?.user.role === "hr_manager"
+        ? "management"
+        : "overview"
+  );
+  const [expandedModuleIndex, setExpandedModuleIndex] = useState(0);
 
   const employeeId = useMemo(() => {
     const fromQuery = Number(searchParams.get("employeeId") ?? "");
@@ -779,14 +788,49 @@ export function ResourceDetailPage() {
         </section>
       </div>
 
+      <section className="panel mb-6 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex gap-2 rounded-full bg-slate-100 p-1">
+            <button
+              className={activePane === "overview" ? "btn-primary" : "rounded-full px-4 py-2 text-sm font-medium text-slate-600"}
+              onClick={() => setActivePane("overview")}
+              type="button"
+            >
+              Overview
+            </button>
+            <button
+              className={activePane === "coursework" ? "btn-primary" : "rounded-full px-4 py-2 text-sm font-medium text-slate-600"}
+              onClick={() => setActivePane("coursework")}
+              type="button"
+            >
+              Coursework
+            </button>
+            <button
+              className={activePane === "management" ? "btn-primary" : "rounded-full px-4 py-2 text-sm font-medium text-slate-600"}
+              onClick={() => setActivePane("management")}
+              type="button"
+            >
+              Tracking
+            </button>
+          </div>
+          <p className="text-sm text-slate-500">
+            {activePane === "overview"
+              ? "Review the pathway purpose, goals, and success indicators."
+              : activePane === "coursework"
+                ? "Focus only on modules, evidence, and the final assignment."
+                : "Use this area for deadlines, decisions, and the progress timeline."}
+          </p>
+        </div>
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="space-y-6">
-          <article className="panel p-6">
+          <article className={activePane === "overview" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Why this pathway matters</h2>
             <p className="mt-4 text-sm leading-7 text-slate-600">{resource.whyItMatters}</p>
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "overview" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Development goals</h2>
             <p className="mt-4 text-sm leading-7 text-slate-600">
               These are the outcomes this pathway is trying to build, not just the content it wants the employee to
@@ -802,7 +846,7 @@ export function ResourceDetailPage() {
             </div>
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "overview" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Learning objectives</h2>
             <div className="mt-4 space-y-3">
               {resource.learningObjectives.map((objective, index) => (
@@ -816,7 +860,7 @@ export function ResourceDetailPage() {
             </div>
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "overview" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Milestone plan</h2>
             <p className="mt-4 text-sm leading-7 text-slate-600">
               The pathway now acts like a guided improvement journey with explicit stages from diagnosis to proof of
@@ -837,41 +881,53 @@ export function ResourceDetailPage() {
             </div>
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "coursework" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Course modules</h2>
             <div className="mt-5 space-y-5">
               {resource.modules.map((module, index) => {
                 const isCompleted = completedModuleIndexes.includes(index);
                 const latestSubmission = moduleSubmissionMap.get(index) ?? null;
                 const reviewValue = latestSubmission ? reviewComments[latestSubmission.id] ?? "" : "";
+                const isExpanded = expandedModuleIndex === index;
 
                 return (
                   <div className="rounded-3xl border border-slate-200 bg-white p-5" key={module.title}>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
-                          Module {index + 1}
-                        </span>
-                        <h3 className="text-lg font-semibold text-slate-950">{module.title}</h3>
+                    <button
+                      className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+                      onClick={() => setExpandedModuleIndex((current) => (current === index ? -1 : index))}
+                      type="button"
+                    >
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+                            Module {index + 1}
+                          </span>
+                          <h3 className="text-lg font-semibold text-slate-950">{module.title}</h3>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-slate-600">{module.objective}</p>
                       </div>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
-                          isCompleted
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+                            isCompleted
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : latestSubmission
+                                ? getStatusTone(latestSubmission.status)
+                                : "border-slate-200 bg-slate-50 text-slate-500"
+                          }`}
+                        >
+                          {isCompleted
+                            ? "Approved complete"
                             : latestSubmission
-                              ? getStatusTone(latestSubmission.status)
-                              : "border-slate-200 bg-slate-50 text-slate-500"
-                        }`}
-                      >
-                        {isCompleted
-                          ? "Approved complete"
-                          : latestSubmission
-                            ? getStatusLabel(latestSubmission.status)
-                            : "Awaiting submission"}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-600">{module.objective}</p>
+                              ? getStatusLabel(latestSubmission.status)
+                              : "Awaiting submission"}
+                        </span>
+                        <span className="text-xs font-medium text-slate-500">{isExpanded ? "Collapse" : "Open"}</span>
+                      </div>
+                    </button>
 
+                    {isExpanded ? (
+                      <>
                     <div className="mt-4 space-y-3">
                       {module.lessons.map((lesson, lessonIndex) => (
                         <div className="rounded-2xl bg-slate-50 px-4 py-3" key={lesson}>
@@ -1026,6 +1082,8 @@ export function ResourceDetailPage() {
                         No evidence has been submitted for this module yet.
                       </p>
                     ) : null}
+                      </>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1034,7 +1092,7 @@ export function ResourceDetailPage() {
         </section>
 
         <section className="space-y-6">
-          <article className="panel p-6">
+          <article className={activePane === "coursework" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Final assignment</h2>
             <p className="mt-4 text-sm leading-7 text-slate-700">{resource.finalAssignment}</p>
 
@@ -1148,7 +1206,7 @@ export function ResourceDetailPage() {
             ) : null}
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "management" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Deadline and completion decision</h2>
             <p className="mt-4 text-sm leading-7 text-slate-700">
               Keep the pathway anchored with a clear deadline and a final HR outcome once the assignment has been fully
@@ -1227,7 +1285,7 @@ export function ResourceDetailPage() {
             )}
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "management" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Development journey timeline</h2>
             <p className="mt-4 text-sm leading-7 text-slate-700">
               This timeline shows how the employee moved from assignment to evidence, review, and pathway outcome.
@@ -1263,7 +1321,7 @@ export function ResourceDetailPage() {
             )}
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "overview" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Success indicators</h2>
             <div className="mt-4 space-y-3">
               {resource.successIndicators.map((indicator) => (
@@ -1274,7 +1332,7 @@ export function ResourceDetailPage() {
             </div>
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "overview" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">External learning resources</h2>
             <p className="mt-4 text-sm leading-7 text-slate-700">
               Use these curated external courses and learning libraries when the employee needs a deeper structured
@@ -1298,7 +1356,7 @@ export function ResourceDetailPage() {
             </div>
           </article>
 
-          <article className="panel p-6">
+          <article className={activePane === "management" ? "panel p-6" : "hidden"}>
             <h2 className="text-xl font-semibold text-slate-950">Manager follow-up</h2>
             <p className="mt-4 text-sm leading-7 text-slate-700">{resource.managerFollowUp}</p>
             <p className="mt-4 text-sm text-slate-500">
