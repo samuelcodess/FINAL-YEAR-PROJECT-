@@ -9,6 +9,7 @@ export type TaskSubmissionRow = {
   employeeId: number;
   employeeName: string;
   submissionNote: string;
+  aiReviewAvailable: boolean;
   aiScore: number;
   aiFeedback: string;
   aiStrengths: string;
@@ -32,12 +33,13 @@ function withLegacyAiDefaults(
   rows: Array<
     Omit<
       TaskSubmissionRow,
-      "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+      "aiReviewAvailable" | "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
     >
   >
 ) {
   return rows.map((row) => ({
     ...row,
+    aiReviewAvailable: false,
     aiScore: 0,
     aiFeedback: "",
     aiStrengths: "",
@@ -55,6 +57,7 @@ export async function listTaskSubmissions(taskId: number) {
          s.employee_id AS employeeId,
          employee_user.full_name AS employeeName,
          s.submission_note AS submissionNote,
+         TRUE AS aiReviewAvailable,
          s.ai_score AS aiScore,
          s.ai_feedback AS aiFeedback,
          s.ai_strengths AS aiStrengths,
@@ -109,7 +112,7 @@ export async function listTaskSubmissions(taskId: number) {
       legacyRows as Array<
         Omit<
           TaskSubmissionRow,
-          "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+          "aiReviewAvailable" | "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
         >
       >
     );
@@ -130,6 +133,7 @@ export async function listTaskSubmissionsForTaskIds(taskIds: number[]) {
          s.employee_id AS employeeId,
          employee_user.full_name AS employeeName,
          s.submission_note AS submissionNote,
+         TRUE AS aiReviewAvailable,
          s.ai_score AS aiScore,
          s.ai_feedback AS aiFeedback,
          s.ai_strengths AS aiStrengths,
@@ -184,7 +188,7 @@ export async function listTaskSubmissionsForTaskIds(taskIds: number[]) {
       legacyRows as Array<
         Omit<
           TaskSubmissionRow,
-          "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+          "aiReviewAvailable" | "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
         >
       >
     );
@@ -258,6 +262,7 @@ export async function findTaskSubmissionById(submissionId: number) {
          s.employee_id AS employeeId,
          employee_user.full_name AS employeeName,
          s.submission_note AS submissionNote,
+         TRUE AS aiReviewAvailable,
          s.ai_score AS aiScore,
          s.ai_feedback AS aiFeedback,
          s.ai_strengths AS aiStrengths,
@@ -310,8 +315,8 @@ export async function findTaskSubmissionById(submissionId: number) {
       withLegacyAiDefaults(
         legacyRows as Array<
           Omit<
-            TaskSubmissionRow,
-            "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
+          TaskSubmissionRow,
+            "aiReviewAvailable" | "aiScore" | "aiFeedback" | "aiStrengths" | "aiImprovements" | "aiRecommendation"
           >
         >
       )[0] ?? null
