@@ -1,29 +1,82 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AppShell } from "./components/layout/AppShell";
 import type { Role } from "./lib/types";
-import { ActivityLogsPage } from "./pages/activity-logs/ActivityLogsPage";
-import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
-import { DashboardPage } from "./pages/dashboard/DashboardPage";
-import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
-import { AddEmployeePage } from "./pages/employees/AddEmployeePage";
-import { EmployeeListPage } from "./pages/employees/EmployeeListPage";
-import { EmployeeProfilePage } from "./pages/employees/EmployeeProfilePage";
-import { EvaluationPage } from "./pages/evaluations/EvaluationPage";
-import { KpiManagementPage } from "./pages/kpis/KpiManagementPage";
-import { NotificationsPage } from "./pages/notifications/NotificationsPage";
-import { ForgotPasswordPage } from "./pages/public/ForgotPasswordPage";
-import { LoginPage } from "./pages/public/LoginPage";
-import { ResetPasswordPage } from "./pages/public/ResetPasswordPage";
-import { RecommendationsPage } from "./pages/recommendations/RecommendationsPage";
-import { ResourceDetailPage } from "./pages/resources/ResourceDetailPage";
-import { ReportsPage } from "./pages/reports/ReportsPage";
-import { SettingsPage } from "./pages/settings/SettingsPage";
-import { TaskDetailPage } from "./pages/tasks/TaskDetailPage";
-import { TasksPage } from "./pages/tasks/TasksPage";
-import { UsersPage } from "./pages/users/UsersPage";
+
+const ActivityLogsPage = lazy(() =>
+  import("./pages/activity-logs/ActivityLogsPage").then((module) => ({ default: module.ActivityLogsPage }))
+);
+const ChangePasswordPage = lazy(() =>
+  import("./pages/auth/ChangePasswordPage").then((module) => ({ default: module.ChangePasswordPage }))
+);
+const DashboardPage = lazy(() =>
+  import("./pages/dashboard/DashboardPage").then((module) => ({ default: module.DashboardPage }))
+);
+const DepartmentsPage = lazy(() =>
+  import("./pages/departments/DepartmentsPage").then((module) => ({ default: module.DepartmentsPage }))
+);
+const AddEmployeePage = lazy(() =>
+  import("./pages/employees/AddEmployeePage").then((module) => ({ default: module.AddEmployeePage }))
+);
+const EmployeeListPage = lazy(() =>
+  import("./pages/employees/EmployeeListPage").then((module) => ({ default: module.EmployeeListPage }))
+);
+const EmployeeProfilePage = lazy(() =>
+  import("./pages/employees/EmployeeProfilePage").then((module) => ({ default: module.EmployeeProfilePage }))
+);
+const EvaluationPage = lazy(() =>
+  import("./pages/evaluations/EvaluationPage").then((module) => ({ default: module.EvaluationPage }))
+);
+const KpiManagementPage = lazy(() =>
+  import("./pages/kpis/KpiManagementPage").then((module) => ({ default: module.KpiManagementPage }))
+);
+const NotificationsPage = lazy(() =>
+  import("./pages/notifications/NotificationsPage").then((module) => ({ default: module.NotificationsPage }))
+);
+const ForgotPasswordPage = lazy(() =>
+  import("./pages/public/ForgotPasswordPage").then((module) => ({ default: module.ForgotPasswordPage }))
+);
+const LoginPage = lazy(() =>
+  import("./pages/public/LoginPage").then((module) => ({ default: module.LoginPage }))
+);
+const ResetPasswordPage = lazy(() =>
+  import("./pages/public/ResetPasswordPage").then((module) => ({ default: module.ResetPasswordPage }))
+);
+const RecommendationsPage = lazy(() =>
+  import("./pages/recommendations/RecommendationsPage").then((module) => ({ default: module.RecommendationsPage }))
+);
+const ResourceDetailPage = lazy(() =>
+  import("./pages/resources/ResourceDetailPage").then((module) => ({ default: module.ResourceDetailPage }))
+);
+const ReportsPage = lazy(() =>
+  import("./pages/reports/ReportsPage").then((module) => ({ default: module.ReportsPage }))
+);
+const SettingsPage = lazy(() =>
+  import("./pages/settings/SettingsPage").then((module) => ({ default: module.SettingsPage }))
+);
+const TaskDetailPage = lazy(() =>
+  import("./pages/tasks/TaskDetailPage").then((module) => ({ default: module.TaskDetailPage }))
+);
+const TasksPage = lazy(() =>
+  import("./pages/tasks/TasksPage").then((module) => ({ default: module.TasksPage }))
+);
+const UsersPage = lazy(() =>
+  import("./pages/users/UsersPage").then((module) => ({ default: module.UsersPage }))
+);
+
+function PageLoader() {
+  return (
+    <div className="panel p-6 text-sm text-slate-500">
+      Loading page...
+    </div>
+  );
+}
+
+function withPageLoader(children: ReactNode) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
 
 function SecurePage({
   children,
@@ -39,8 +92,9 @@ function ProtectedLayout() {
   return (
     <ProtectedRoute>
       <AppShell>
-        <Routes>
-          <Route path="/dashboard" element={<DashboardPage />} />
+        {withPageLoader(
+          <Routes>
+            <Route path="/dashboard" element={<DashboardPage />} />
           <Route
             path="/employees"
             element={
@@ -134,7 +188,8 @@ function ProtectedLayout() {
           />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+          </Routes>
+        )}
       </AppShell>
     </ProtectedRoute>
   );
@@ -142,21 +197,23 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/change-password"
-        element={
-          <ProtectedRoute>
-            <ChangePasswordPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/register" element={<Navigate to="/login" replace />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/*" element={<ProtectedLayout />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/*" element={<ProtectedLayout />} />
+      </Routes>
+    </Suspense>
   );
 }
